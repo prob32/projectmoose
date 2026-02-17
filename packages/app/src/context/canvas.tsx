@@ -57,6 +57,17 @@ type CanvasStore = {
   agentMessages: AgentMessage[]
   /** Instance IDs that recently completed a task (working → idle). Auto-expires after 2s. */
   completedInstances: Record<string, number>
+  /** Lasso drag rectangle state (for multi-select) */
+  lasso: { startX: number; startY: number; currentX: number; currentY: number } | undefined
+  /** IDs of instances currently inside the lasso rectangle */
+  lassoSelectedIDs: string[]
+  /** Active group chat (undefined when no group is active) */
+  groupChat: {
+    memberInstanceIDs: string[]
+    sessionID: string
+    status: "idle" | "running"
+    currentAgentIndex: number
+  } | undefined
 }
 
 export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext({
@@ -77,6 +88,9 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       gcWarnings: {},
       agentMessages: [],
       completedInstances: {},
+      lasso: undefined,
+      lassoSelectedIDs: [],
+      groupChat: undefined,
     })
 
     // Subscribe to real-time agent events via SSE
@@ -419,6 +433,62 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       setStore("selectedID", undefined)
     }
 
+    // Lasso (multi-select) helpers
+    function startLasso(x: number, y: number) {
+      setStore("lasso", { startX: x, startY: y, currentX: x, currentY: y })
+    }
+
+    function updateLasso(x: number, y: number) {
+      setStore("lasso", { startX: store.lasso!.startX, startY: store.lasso!.startY, currentX: x, currentY: y })
+
+      const l = store.lasso!
+      const x1 = Math.min(l.startX, x), y1 = Math.min(l.startY, y)
+      const x2 = Math.max(l.startX, x), y2 = Math.max(l.startY, y)
+      const NODE_CENTER = 36
+
+      const ids = store.instances
+        .filter((inst) => {
+          const cx = inst.positionX + NODE_CENTER
+          const cy = inst.positionY + NODE_CENTER
+          return cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2
+        })
+        .map((inst) => inst.id)
+
+      setStore("lassoSelectedIDs", ids)
+    }
+
+    function endLasso() {
+      setStore("lasso", undefined)
+    }
+
+    function clearLassoSelection() {
+      setStore("lassoSelectedIDs", [])
+    }
+
+    // Group chat helpers
+    function createGroupChat(sessionID: string, memberInstanceIDs: string[]) {
+      setStore("groupChat", {
+        memberInstanceIDs,
+        sessionID,
+        status: "idle" as const,
+        currentAgentIndex: 0,
+      })
+      // Bake lasso selection into group — clear lasso visual
+      setStore("lassoSelectedIDs", [])
+    }
+
+    function clearGroupChat() {
+      setStore("groupChat", undefined)
+    }
+
+    function setGroupChatStatus(status: "idle" | "running", index?: number) {
+      if (!store.groupChat) return
+      setStore("groupChat", "status", status)
+      if (index !== undefined) {
+        setStore("groupChat", "currentAgentIndex", index)
+      }
+    }
+
     // Drag helpers
     function startDrag(id: string, offsetX: number, offsetY: number) {
       setStore("draggingID", id)
@@ -525,6 +595,15 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       get completedInstances() {
         return store.completedInstances
       },
+      get lasso() {
+        return store.lasso
+      },
+      get lassoSelectedIDs() {
+        return store.lassoSelectedIDs
+      },
+      get groupChat() {
+        return store.groupChat
+      },
       selected,
       connections,
       definitionFor,
@@ -545,6 +624,13 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       closeContextMenu,
       openNodeContextMenu,
       closeNodeContextMenu,
+      startLasso,
+      updateLasso,
+      endLasso,
+      clearLassoSelection,
+      createGroupChat,
+      clearGroupChat,
+      setGroupChatStatus,
     }
   },
 })

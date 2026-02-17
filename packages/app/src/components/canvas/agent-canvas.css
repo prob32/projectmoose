@@ -803,3 +803,44 @@
 .instances-overlay::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 92, 246, 0.35);
 }
+
+/* ================================================================
+   Lasso Selection Rectangle
+   ================================================================ */
+
+.lasso-rect {
+  position: absolute;
+  border: 2px dashed rgba(139, 92, 246, 0.6);
+  background: rgba(139, 92, 246, 0.06);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+  backdrop-filter: blur(1px);
+}
+
+/* ================================================================
+   Group-Selected / Group Chat Member Highlight
+   ================================================================ */
+
+.agent-node.group-selected .agent-node-circle {
+  box-shadow:
+    0 0 0 3px rgba(139, 92, 246, 0.5),
+    0 0 20px rgba(139, 92, 246, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+  animation: group-selected-pulse 2s ease-in-out infinite;
+}
+
+@keyframes group-selected-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 3px rgba(139, 92, 246, 0.5),
+      0 0 20px rgba(139, 92, 246, 0.15),
+      0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(139, 92, 246, 0.35),
+      0 0 30px rgba(139, 92, 246, 0.2),
+      0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}

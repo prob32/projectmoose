@@ -385,6 +385,253 @@ function TaskAssigner(props: {
   )
 }
 
+/** Group Chat Panel — shared conversation between multiple lasso-selected agents */
+function GroupChatPanel() {
+  const canvas = useCanvas()
+  const sync = useSync()
+  const sdk = useSDK()
+  const [inputText, setInputText] = createSignal("")
+
+  const group = () => canvas.groupChat
+  const sessionID = () => group()?.sessionID
+
+  // Load messages for the group session
+  createEffect(() => {
+    const sid = sessionID()
+    if (sid) {
+      sync.session.message(sid)
+    }
+  })
+
+  const messages = createMemo(() => {
+    const sid = sessionID()
+    if (!sid) return []
+    return sync.data.message[sid] ?? []
+  })
+
+  const partsFor = (messageID: string) => {
+    const sid = sessionID()
+    if (!sid) return []
+    return sync.data.part[sid]?.[messageID] ?? []
+  }
+
+  // Resolve member instances + definitions
+  const members = createMemo(() => {
+    const g = group()
+    if (!g) return []
+    return g.memberInstanceIDs
+      .map((id) => {
+        const inst = canvas.instances.find((i) => i.id === id)
+        if (!inst) return undefined
+        const def = canvas.definitionFor(inst)
+        return { instance: inst, definition: def }
+      })
+      .filter(Boolean) as Array<{ instance: AgentInstanceInfo; definition: AgentDefinitionInfo | undefined }>
+  })
+
+  // Resolve agent color from a message's `agent` field
+  function agentColorForMessage(msg: Message): string | undefined {
+    const agentID = (msg as any).agent as string | undefined
+    if (!agentID) return undefined
+    const member = members().find((m) => (m.definition?.id ?? m.instance.agentDefinitionID) === agentID)
+    return member?.definition?.color
+  }
+
+  function agentNameForMessage(msg: Message): string | undefined {
+    const agentID = (msg as any).agent as string | undefined
+    if (!agentID) return undefined
+    const member = members().find((m) => (m.definition?.id ?? m.instance.agentDefinitionID) === agentID)
+    return member?.definition?.name ?? agentID
+  }
+
+  // Current responding agent info
+  const currentAgent = createMemo(() => {
+    const g = group()
+    if (!g || g.status !== "running") return undefined
+    return members()[g.currentAgentIndex]
+  })
+
+  async function handleSend() {
+    const text = inputText().trim()
+    if (!text || !group()) return
+    setInputText("")
+
+    // Import dynamically to avoid circular deps
+    const { startRoundRobin } = await import("@/components/canvas/group-chat-orchestrator")
+    startRoundRobin(text, {
+      client: sdk.client,
+      syncData: sync.data,
+      canvas: {
+        instances: canvas.instances,
+        groupChat: canvas.groupChat!,
+        definitionFor: canvas.definitionFor,
+        setGroupChatStatus: canvas.setGroupChatStatus,
+      },
+    })
+  }
+
+  async function handleStop() {
+    const { abortRoundRobin } = await import("@/components/canvas/group-chat-orchestrator")
+    abortRoundRobin({
+      client: sdk.client,
+      canvas: {
+        groupChat: canvas.groupChat!,
+        setGroupChatStatus: canvas.setGroupChatStatus,
+      } as any,
+    })
+  }
+
+  function handleClose() {
+    handleStop()
+    canvas.clearGroupChat()
+  }
+
+  // Auto-scroll ref
+  let scrollRef: HTMLDivElement | undefined
+  createEffect(() => {
+    // Trigger on messages change
+    messages()
+    if (scrollRef) {
+      setTimeout(() => scrollRef!.scrollTo({ top: scrollRef!.scrollHeight, behavior: "smooth" }), 50)
+    }
+  })
+
+  return (
+    <Show when={group()}>
+      <div class="flex-1 min-h-0 flex flex-col pointer-events-auto border-t border-border-weak-base bg-background-stronger/95 backdrop-blur-sm">
+        {/* Header */}
+        <div class="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border-weak-base">
+          <div class="flex items-center gap-2">
+            <span class="text-12-medium text-text-strong">Group Chat</span>
+            <div class="flex items-center gap-1">
+              <For each={members()}>
+                {(m) => (
+                  <div
+                    class="size-2 rounded-full"
+                    style={{ "background-color": m.definition?.color ?? "#666" }}
+                    title={m.definition?.name ?? m.instance.agentDefinitionID}
+                  />
+                )}
+              </For>
+            </div>
+            <span class="text-11-regular text-text-weak">
+              {members().length} agents
+            </span>
+          </div>
+          <div class="flex items-center gap-2">
+            {/* Progress indicator */}
+            <Show when={group()!.status === "running" && currentAgent()}>
+              <div class="flex items-center gap-1.5 text-11-regular text-text-weak animate-pulse">
+                <div
+                  class="size-2 rounded-full"
+                  style={{ "background-color": currentAgent()!.definition?.color ?? "#666" }}
+                />
+                <span>
+                  {currentAgent()!.definition?.name ?? "Agent"} responding...
+                  ({group()!.currentAgentIndex + 1}/{group()!.memberInstanceIDs.length})
+                </span>
+              </div>
+            </Show>
+            <button
+              classList={{
+                "h-6 px-2 flex items-center gap-1 rounded-md text-11-medium border transition-colors": true,
+                "text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/30": group()!.status === "running",
+                "text-text-weak hover:text-text-strong hover:bg-surface-base-hover border-border-weak-base": group()!.status !== "running",
+              }}
+              onClick={group()!.status === "running" ? handleStop : handleClose}
+              aria-label={group()!.status === "running" ? "Stop round-robin" : "Close group chat"}
+            >
+              <Icon name="close" class="size-3" />
+              {group()!.status === "running" ? "Stop" : "Close"}
+            </button>
+          </div>
+        </div>
+
+        {/* Messages scroll area */}
+        <div ref={scrollRef} class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+          <Show
+            when={messages().length > 0}
+            fallback={
+              <div class="flex flex-col items-center justify-center py-8 text-center">
+                <div class="text-12-regular text-text-weak">Group chat created</div>
+                <div class="text-11-regular text-text-weak mt-1">
+                  Type a prompt below — each agent will respond in turn
+                </div>
+              </div>
+            }
+          >
+            <div class="flex flex-col gap-2">
+              <For each={messages()}>
+                {(msg) => {
+                  const color = () => agentColorForMessage(msg)
+                  const name = () => agentNameForMessage(msg)
+                  return (
+                    <div>
+                      <Show when={msg.role === "assistant" && name()}>
+                        <div
+                          class="text-10-medium mb-0.5 px-1"
+                          style={{ color: color() ?? "#8b87a0" }}
+                        >
+                          {name()}
+                        </div>
+                      </Show>
+                      <ChatBubble message={msg} parts={partsFor(msg.id)} agentColor={color()} />
+                    </div>
+                  )
+                }}
+              </For>
+
+              {/* Working indicator */}
+              <Show when={group()!.status === "running"}>
+                <div class="flex items-center gap-2 px-3 py-2 mt-2 rounded-md border border-purple-500/30 bg-purple-500/5">
+                  <div
+                    class="size-2 rounded-full"
+                    style={{ "background-color": currentAgent()?.definition?.color ?? "#8b5cf6" }}
+                  />
+                  <span class="text-purple-400 text-12-medium animate-pulse">
+                    {currentAgent()?.definition?.name ?? "Agent"} is thinking...
+                  </span>
+                </div>
+              </Show>
+            </div>
+          </Show>
+        </div>
+
+        {/* Input area */}
+        <div class="shrink-0 px-4 py-3 border-t border-border-weak-base">
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              class="flex-1 h-8 px-3 rounded-md bg-surface-base border border-border-weak-base text-13-regular text-text-strong placeholder:text-text-weak focus:outline-none focus:border-purple-500/50"
+              placeholder={
+                group()!.status === "running"
+                  ? "Waiting for agents..."
+                  : "Send a prompt to all agents..."
+              }
+              value={inputText()}
+              onInput={(e) => setInputText(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              disabled={group()!.status === "running"}
+            />
+            <button
+              class="h-8 px-3 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-12-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={handleSend}
+              disabled={group()!.status === "running" || !inputText().trim()}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </Show>
+  )
+}
+
 /** Collapsible todo list for the selected agent's session */
 function AgentTodoPanel(props: { sessionID: string; agentColor?: string }) {
   const sync = useSync()
@@ -670,10 +917,15 @@ export function SessionPromptDock(props: {
     <div
       ref={props.setPromptDockRef}
       class="absolute inset-x-0 bottom-0 flex flex-col justify-end z-50 pointer-events-none"
-      style={{ "max-height": selectedAgent() ? "45vh" : undefined }}
+      style={{ "max-height": selectedAgent() || canvas.groupChat ? "45vh" : undefined }}
     >
-      {/* Agent chat panel — expands upward when an agent is selected */}
-      <Show when={agentSessionID()}>
+      {/* Group chat panel — takes priority over single-agent panel */}
+      <Show when={canvas.groupChat}>
+        <GroupChatPanel />
+      </Show>
+
+      {/* Agent chat panel — expands upward when an agent is selected (hidden when group chat is active) */}
+      <Show when={agentSessionID() && !canvas.groupChat}>
         <div class="flex-1 min-h-0 flex flex-col pointer-events-auto border-t border-border-weak-base bg-background-stronger/95 backdrop-blur-sm">
           {/* Agent header bar */}
           <div class="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border-weak-base">

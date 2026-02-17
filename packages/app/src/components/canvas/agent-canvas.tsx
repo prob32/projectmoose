@@ -1,6 +1,7 @@
 import { type Component, For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { useCanvas } from "@/context/canvas"
 import { useSync } from "@/context/sync"
+import { useSDK } from "@/context/sdk"
 import { getSessionContextMetrics } from "@/components/session/session-context-metrics"
 import { AgentNode } from "./agent-node"
 import { AgentConnection } from "./agent-connection"
@@ -19,6 +20,7 @@ export type AgentCanvasProps = {
 export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
   const canvas = useCanvas()
   const sync = useSync()
+  const sdk = useSDK()
 
   /** Compute context usage percentage for each instance (keyed by instance ID) */
   const contextUsageMap = createMemo(() => {
@@ -70,6 +72,9 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
   // ===== Drag handling =====
   const [dragPos, setDragPos] = createSignal<{ x: number; y: number } | undefined>()
 
+  /** Track whether a lasso just ended so we don't deselect on the same click */
+  let lassoJustEnded = false
+
   function handlePointerDown(instanceID: string, e: PointerEvent) {
     e.preventDefault()
     e.stopPropagation()
@@ -86,27 +91,74 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
     ;(e.target as HTMLElement).setPointerCapture?.(e.pointerId)
   }
 
+  /** Start a lasso selection when clicking on the canvas background */
+  function handleCanvasPointerDown(e: PointerEvent) {
+    if (e.button !== 0) return
+    // Only trigger on canvas background — not on agent nodes
+    const target = e.target as HTMLElement
+    if (target.closest?.(".agent-node")) return
+
+    if (!canvasRef) return
+    const rect = canvasRef.getBoundingClientRect()
+    canvas.startLasso(e.clientX - rect.left, e.clientY - rect.top)
+    canvas.deselect()
+  }
+
   function handlePointerMove(e: PointerEvent) {
+    // Node dragging
     const dragging = canvas.draggingID
-    if (!dragging) return
+    if (dragging) {
+      const newX = e.clientX - canvas.dragOffset.x
+      const newY = e.clientY - canvas.dragOffset.y
+      canvas.moveInstance(dragging, Math.max(0, newX), Math.max(0, newY))
+      return
+    }
 
-    const newX = e.clientX - canvas.dragOffset.x
-    const newY = e.clientY - canvas.dragOffset.y
-
-    // Optimistic local position update during drag
-    canvas.moveInstance(dragging, Math.max(0, newX), Math.max(0, newY))
+    // Lasso tracking
+    if (canvas.lasso && canvasRef) {
+      const rect = canvasRef.getBoundingClientRect()
+      canvas.updateLasso(e.clientX - rect.left, e.clientY - rect.top)
+    }
   }
 
   function handlePointerUp(_e: PointerEvent) {
+    // Finish node drag
     const dragging = canvas.draggingID
-    if (!dragging) return
-
-    const instance = canvas.instances.find((i) => i.id === dragging)
-    if (instance) {
-      // Final position is already set via moveInstance (optimistic + API call)
+    if (dragging) {
+      canvas.stopDrag()
+      return
     }
 
-    canvas.stopDrag()
+    // Finish lasso
+    if (canvas.lasso) {
+      canvas.endLasso()
+      if (canvas.lassoSelectedIDs.length >= 2) {
+        handleGroupChatCreation(canvas.lassoSelectedIDs)
+      } else {
+        canvas.clearLassoSelection()
+      }
+      lassoJustEnded = true
+      setTimeout(() => { lassoJustEnded = false }, 50)
+    }
+  }
+
+  /** Create a group chat session from selected instances */
+  async function handleGroupChatCreation(instanceIDs: string[]) {
+    const members = instanceIDs
+      .map((id) => canvas.instances.find((i) => i.id === id))
+      .filter(Boolean) as typeof canvas.instances
+    const names = members.map((m) => canvas.definitionFor(m)?.name ?? "Agent").join(", ")
+
+    try {
+      const result = await sdk.client.session.create({
+        body: { title: `Group: ${names}` },
+      })
+      if (result.data) {
+        canvas.createGroupChat(result.data.id, instanceIDs)
+      }
+    } catch {
+      canvas.clearLassoSelection()
+    }
   }
 
   // ===== Context menu =====
@@ -124,6 +176,8 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
 
   // ===== Click on empty canvas to deselect =====
   function handleCanvasClick(e: MouseEvent) {
+    // Skip if a lasso just ended (avoid deselecting the group)
+    if (lassoJustEnded) return
     // Only deselect if clicking directly on the canvas background
     if (e.target === canvasRef || (e.target as HTMLElement).tagName === "svg") {
       canvas.deselect()
@@ -143,6 +197,10 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
       !!target.closest?.("[contenteditable]")
 
     if (e.key === "Escape") {
+      if (canvas.groupChat) {
+        canvas.clearGroupChat()
+      }
+      canvas.clearLassoSelection()
       canvas.deselect()
       canvas.closeContextMenu()
       canvas.closeNodeContextMenu()
@@ -166,11 +224,33 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
     <div
       ref={canvasRef}
       class="agent-canvas"
+      onPointerDown={handleCanvasPointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onContextMenu={handleContextMenu}
       onClick={handleCanvasClick}
     >
+      {/* Lasso selection overlay */}
+      <Show when={canvas.lasso}>
+        {(l) => {
+          const x = () => Math.min(l().startX, l().currentX)
+          const y = () => Math.min(l().startY, l().currentY)
+          const w = () => Math.abs(l().currentX - l().startX)
+          const h = () => Math.abs(l().currentY - l().startY)
+          return (
+            <div
+              class="lasso-rect"
+              style={{
+                left: `${x()}px`,
+                top: `${y()}px`,
+                width: `${w()}px`,
+                height: `${h()}px`,
+              }}
+            />
+          )
+        }}
+      </Show>
+
       {/* SVG layer for connection lines */}
       <svg
         style={{
@@ -206,6 +286,10 @@ export const AgentCanvas: Component<AgentCanvasProps> = (props) => {
             instance={instance}
             definition={canvas.definitionFor(instance)}
             selected={canvas.selectedID === instance.id}
+            groupSelected={
+              canvas.lassoSelectedIDs.includes(instance.id) ||
+              !!canvas.groupChat?.memberInstanceIDs.includes(instance.id)
+            }
             gcWarning={!!canvas.gcWarnings[instance.id]}
             taskComplete={!!canvas.completedInstances[instance.id]}
             contextUsage={contextUsageMap()[instance.id]}
