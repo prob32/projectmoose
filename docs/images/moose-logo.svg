@@ -1,161 +1,285 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e"/>
-      <stop offset="100%" style="stop-color:#16213e"/>
+    <!-- Fur gradients - multiple tones for realism -->
+    <linearGradient id="darkFur" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4a3728"/>
+      <stop offset="50%" style="stop-color:#3b2a1a"/>
+      <stop offset="100%" style="stop-color:#2d1f14"/>
     </linearGradient>
-    <linearGradient id="antlerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#c9a55a"/>
-      <stop offset="100%" style="stop-color:#8B6914"/>
+    <linearGradient id="midFur" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6b4f3a"/>
+      <stop offset="100%" style="stop-color:#55402d"/>
     </linearGradient>
-    <linearGradient id="furGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#5c3d2e"/>
-      <stop offset="100%" style="stop-color:#3e2723"/>
+    <linearGradient id="lightFur" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b6f55"/>
+      <stop offset="100%" style="stop-color:#7a5e46"/>
     </linearGradient>
-    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#8B5CF6"/>
-      <stop offset="40%" style="stop-color:#6d28d9"/>
-      <stop offset="100%" style="stop-color:#4c1d95"/>
+    <linearGradient id="muzzleFur" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7a6050"/>
+      <stop offset="100%" style="stop-color:#5c4535"/>
     </linearGradient>
-    <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:rgba(255,255,255,0.3)"/>
+
+    <!-- Palmate antler gradient -->
+    <linearGradient id="antlerBase" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4a84b"/>
+      <stop offset="30%" style="stop-color:#c49a3e"/>
+      <stop offset="70%" style="stop-color:#a8822f"/>
+      <stop offset="100%" style="stop-color:#8a6a22"/>
+    </linearGradient>
+    <linearGradient id="antlerLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8c46a"/>
+      <stop offset="100%" style="stop-color:#c49a3e"/>
+    </linearGradient>
+
+    <!-- Heart sunglasses - rose/red tint like reference -->
+    <linearGradient id="lensRose" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8446a"/>
+      <stop offset="35%" style="stop-color:#d63865"/>
+      <stop offset="70%" style="stop-color:#c42d5a"/>
+      <stop offset="100%" style="stop-color:#a82050"/>
+    </linearGradient>
+    <linearGradient id="lensShine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.35)"/>
+      <stop offset="50%" style="stop-color:rgba(255,200,220,0.1)"/>
       <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
     </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
+    <linearGradient id="frameGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d63865"/>
+      <stop offset="100%" style="stop-color:#8a1538"/>
+    </linearGradient>
+
+    <!-- Nose gradient -->
+    <radialGradient id="noseGrad" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" style="stop-color:#4a3a30"/>
+      <stop offset="60%" style="stop-color:#2d1f14"/>
+      <stop offset="100%" style="stop-color:#1a1008"/>
+    </radialGradient>
+
+    <!-- Background -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#1e2a3a"/>
+      <stop offset="100%" style="stop-color:#0f1419"/>
+    </radialGradient>
+
+    <filter id="softShadow">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="innerGlow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
       </feMerge>
     </filter>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+    <filter id="furTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="4" seed="3" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
+
+    <!-- Clipping paths for heart lenses -->
+    <clipPath id="heartLeft">
+      <path d="M 162 204 C 162 192 148 186 140 194 C 130 204 140 220 162 236
+               C 184 220 194 204 184 194 C 176 186 162 192 162 204 Z"/>
+    </clipPath>
+    <clipPath id="heartRight">
+      <path d="M 338 204 C 338 192 324 186 316 194 C 306 204 316 220 338 236
+               C 360 220 370 204 360 194 C 352 186 338 192 338 204 Z"/>
+    </clipPath>
   </defs>
 
-  <!-- Background circle -->
-  <circle cx="200" cy="200" r="190" fill="url(#bg)" stroke="#8B5CF6" stroke-width="3" opacity="0.95"/>
-  <circle cx="200" cy="200" r="186" fill="none" stroke="#8B5CF6" stroke-width="0.5" opacity="0.3"/>
+  <!-- Background -->
+  <rect width="500" height="500" rx="40" ry="40" fill="url(#bgGrad)"/>
 
-  <!-- Left antler -->
-  <g filter="url(#shadow)">
-    <!-- Main beam left -->
-    <path d="M 168 165 Q 155 130 130 95 Q 120 78 105 70"
-          stroke="url(#antlerGrad)" stroke-width="9" fill="none" stroke-linecap="round"/>
-    <!-- Tine 1 left -->
-    <path d="M 148 128 Q 130 115 115 100"
-          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
-    <!-- Tine 2 left -->
-    <path d="M 138 108 Q 125 95 108 88"
-          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <!-- Palm/top left -->
-    <path d="M 130 95 Q 118 80 100 72 Q 92 68 80 72"
-          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
-    <path d="M 105 70 Q 95 55 78 50"
-          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <path d="M 105 70 Q 100 60 92 52"
-          stroke="url(#antlerGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- Subtle background particles/stars -->
+  <circle cx="80" cy="60" r="1.2" fill="#8B5CF6" opacity="0.3"/>
+  <circle cx="420" cy="45" r="1" fill="#8B5CF6" opacity="0.25"/>
+  <circle cx="55" cy="380" r="0.8" fill="#e8446a" opacity="0.2"/>
+  <circle cx="445" cy="400" r="1.1" fill="#e8446a" opacity="0.2"/>
+  <circle cx="130" cy="430" r="0.9" fill="#8B5CF6" opacity="0.15"/>
+  <circle cx="370" cy="450" r="1" fill="#8B5CF6" opacity="0.15"/>
+
+  <!-- ====== LEFT ANTLER (Palmate) ====== -->
+  <g filter="url(#softShadow)">
+    <!-- Main beam rising from head -->
+    <path d="M 185 175 C 175 150 160 120 140 90 C 130 72 118 60 105 52"
+          stroke="url(#antlerBase)" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <!-- Palm plate (the flat palmate part) -->
+    <path d="M 140 90 C 125 70 105 55 78 48
+             C 68 46 55 50 50 58
+             C 45 68 48 82 58 88
+             C 68 94 80 92 90 85
+             L 105 52"
+          fill="url(#antlerBase)" stroke="url(#antlerLight)" stroke-width="1"/>
+    <!-- Tines from palm -->
+    <path d="M 78 48 C 68 32 55 22 42 18" stroke="url(#antlerBase)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 65 55 C 50 40 38 35 28 36" stroke="url(#antlerBase)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M 58 70 C 42 60 30 58 22 62" stroke="url(#antlerBase)" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <!-- Brow tine -->
+    <path d="M 170 140 C 155 128 138 122 125 125" stroke="url(#antlerBase)" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <!-- Inner tine -->
+    <path d="M 155 115 C 142 100 128 92 115 95" stroke="url(#antlerBase)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <!-- Antler texture lines -->
+    <path d="M 180 165 C 172 145 162 125 148 100" stroke="#8a6a22" stroke-width="1" fill="none" opacity="0.3"/>
+    <path d="M 175 170 C 168 152 158 132 145 108" stroke="#e8c46a" stroke-width="0.8" fill="none" opacity="0.15"/>
   </g>
 
-  <!-- Right antler -->
-  <g filter="url(#shadow)">
-    <path d="M 232 165 Q 245 130 270 95 Q 280 78 295 70"
-          stroke="url(#antlerGrad)" stroke-width="9" fill="none" stroke-linecap="round"/>
-    <path d="M 252 128 Q 270 115 285 100"
-          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
-    <path d="M 262 108 Q 275 95 292 88"
-          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <path d="M 270 95 Q 282 80 300 72 Q 308 68 320 72"
-          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
-    <path d="M 295 70 Q 305 55 322 50"
-          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <path d="M 295 70 Q 300 60 308 52"
-          stroke="url(#antlerGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- ====== RIGHT ANTLER (Palmate, mirrored) ====== -->
+  <g filter="url(#softShadow)">
+    <path d="M 315 175 C 325 150 340 120 360 90 C 370 72 382 60 395 52"
+          stroke="url(#antlerBase)" stroke-width="12" fill="none" stroke-linecap="round"/>
+    <path d="M 360 90 C 375 70 395 55 422 48
+             C 432 46 445 50 450 58
+             C 455 68 452 82 442 88
+             C 432 94 420 92 410 85
+             L 395 52"
+          fill="url(#antlerBase)" stroke="url(#antlerLight)" stroke-width="1"/>
+    <path d="M 422 48 C 432 32 445 22 458 18" stroke="url(#antlerBase)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 435 55 C 450 40 462 35 472 36" stroke="url(#antlerBase)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M 442 70 C 458 60 470 58 478 62" stroke="url(#antlerBase)" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <path d="M 330 140 C 345 128 362 122 375 125" stroke="url(#antlerBase)" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M 345 115 C 358 100 372 92 385 95" stroke="url(#antlerBase)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 320 165 C 328 145 338 125 352 100" stroke="#8a6a22" stroke-width="1" fill="none" opacity="0.3"/>
+    <path d="M 325 170 C 332 152 342 132 355 108" stroke="#e8c46a" stroke-width="0.8" fill="none" opacity="0.15"/>
   </g>
 
-  <!-- Ears -->
-  <ellipse cx="148" cy="172" rx="18" ry="12" transform="rotate(-30 148 172)" fill="#5c3d2e" stroke="#3e2723" stroke-width="1.5"/>
-  <ellipse cx="148" cy="172" rx="12" ry="7" transform="rotate(-30 148 172)" fill="#8d6e63"/>
-  <ellipse cx="252" cy="172" rx="18" ry="12" transform="rotate(30 252 172)" fill="#5c3d2e" stroke="#3e2723" stroke-width="1.5"/>
-  <ellipse cx="252" cy="172" rx="12" ry="7" transform="rotate(30 252 172)" fill="#8d6e63"/>
+  <!-- ====== EARS ====== -->
+  <ellipse cx="170" cy="178" rx="24" ry="14" transform="rotate(-35 170 178)" fill="#4a3728" stroke="#3b2a1a" stroke-width="1.5"/>
+  <ellipse cx="170" cy="178" rx="16" ry="9" transform="rotate(-35 170 178)" fill="#6b4f3a" opacity="0.7"/>
+  <ellipse cx="330" cy="178" rx="24" ry="14" transform="rotate(35 330 178)" fill="#4a3728" stroke="#3b2a1a" stroke-width="1.5"/>
+  <ellipse cx="330" cy="178" rx="16" ry="9" transform="rotate(35 330 178)" fill="#6b4f3a" opacity="0.7"/>
 
-  <!-- Head shape -->
-  <g filter="url(#shadow)">
-    <path d="M 155 180
-             Q 150 200 152 230
-             Q 155 260 165 280
-             Q 175 300 185 310
-             Q 195 318 200 320
-             Q 205 318 215 310
-             Q 225 300 235 280
-             Q 245 260 248 230
-             Q 250 200 245 180
-             Q 235 160 200 155
-             Q 165 160 155 180 Z"
-          fill="url(#furGrad)"/>
+  <!-- ====== HEAD / FACE ====== -->
+  <g filter="url(#softShadow)">
+    <!-- Main head shape — broader, more natural moose proportions -->
+    <path d="M 175 190
+             C 168 210 165 235 167 260
+             C 170 285 178 308 190 325
+             C 200 338 212 348 225 355
+             C 238 362 250 365 250 365
+             C 250 365 262 362 275 355
+             C 288 348 300 338 310 325
+             C 322 308 330 285 333 260
+             C 335 235 332 210 325 190
+             C 318 170 290 158 250 155
+             C 210 158 182 170 175 190 Z"
+          fill="url(#darkFur)"/>
+
+    <!-- Forehead lighter patch -->
+    <path d="M 205 175 C 215 168 235 165 250 165 C 265 165 285 168 295 175
+             C 302 182 305 195 300 210
+             C 290 200 270 194 250 192
+             C 230 194 210 200 200 210
+             C 195 195 198 182 205 175 Z"
+          fill="url(#midFur)" opacity="0.6"/>
+
+    <!-- Cheek fur patches -->
+    <path d="M 175 220 C 172 240 175 260 185 275
+             C 192 262 195 245 193 228
+             C 191 215 185 208 175 220 Z"
+          fill="url(#lightFur)" opacity="0.3"/>
+    <path d="M 325 220 C 328 240 325 260 315 275
+             C 308 262 305 245 307 228
+             C 309 215 315 208 325 220 Z"
+          fill="url(#lightFur)" opacity="0.3"/>
   </g>
 
-  <!-- Lighter face area -->
-  <path d="M 170 200
-           Q 168 225 172 250
-           Q 180 275 190 290
-           Q 195 296 200 298
-           Q 205 296 210 290
-           Q 220 275 228 250
-           Q 232 225 230 200
-           Q 225 185 200 182
-           Q 175 185 170 200 Z"
-        fill="#6d4c41" opacity="0.7"/>
+  <!-- Face center - lighter muzzle area -->
+  <path d="M 210 240
+           C 205 260 208 280 218 300
+           C 228 315 240 328 250 332
+           C 260 328 272 315 282 300
+           C 292 280 295 260 290 240
+           C 282 225 268 218 250 216
+           C 232 218 218 225 210 240 Z"
+        fill="url(#muzzleFur)" opacity="0.5"/>
 
-  <!-- Sunglasses -->
-  <g filter="url(#glow)">
-    <!-- Bridge -->
-    <path d="M 183 210 Q 200 205 217 210" stroke="#1a1a1a" stroke-width="4" fill="none"/>
-
-    <!-- Left lens -->
-    <ellipse cx="170" cy="212" rx="26" ry="20" fill="url(#glassGrad)" stroke="#1a1a1a" stroke-width="3"/>
-    <ellipse cx="170" cy="212" rx="26" ry="20" fill="url(#glassShine)"/>
-    <!-- Lens reflection -->
-    <ellipse cx="162" cy="206" rx="10" ry="6" fill="rgba(255,255,255,0.15)" transform="rotate(-15 162 206)"/>
-
-    <!-- Right lens -->
-    <ellipse cx="230" cy="212" rx="26" ry="20" fill="url(#glassGrad)" stroke="#1a1a1a" stroke-width="3"/>
-    <ellipse cx="230" cy="212" rx="26" ry="20" fill="url(#glassShine)"/>
-    <!-- Lens reflection -->
-    <ellipse cx="222" cy="206" rx="10" ry="6" fill="rgba(255,255,255,0.15)" transform="rotate(-15 222 206)"/>
-
-    <!-- Temple arms -->
-    <path d="M 144 210 Q 135 208 130 210" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-    <path d="M 256 210 Q 265 208 270 210" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <!-- Fur texture strokes on face -->
+  <g opacity="0.2" stroke="#2d1f14" fill="none" stroke-width="0.8">
+    <path d="M 220 185 C 225 180 240 177 250 176"/>
+    <path d="M 280 185 C 275 180 260 177 250 176"/>
+    <path d="M 195 210 C 200 205 210 200 220 198"/>
+    <path d="M 305 210 C 300 205 290 200 280 198"/>
+    <path d="M 190 250 C 195 245 205 240 215 238"/>
+    <path d="M 310 250 C 305 245 295 240 285 238"/>
+  </g>
+  <!-- Light fur highlights -->
+  <g opacity="0.1" stroke="#b8946e" fill="none" stroke-width="0.6">
+    <path d="M 215 190 C 230 184 245 182 250 182"/>
+    <path d="M 285 190 C 270 184 255 182 250 182"/>
+    <path d="M 200 230 C 210 222 225 218 240 216"/>
+    <path d="M 300 230 C 290 222 275 218 260 216"/>
   </g>
 
-  <!-- Nose/muzzle -->
-  <ellipse cx="200" cy="262" rx="22" ry="15" fill="#2d1b14"/>
-  <ellipse cx="200" cy="260" rx="20" ry="13" fill="#3e2723"/>
+  <!-- ====== HEART-SHAPED SUNGLASSES ====== -->
+  <g filter="url(#innerGlow)">
+    <!-- Bridge connecting the two hearts -->
+    <path d="M 186 210 C 200 202 220 198 250 198 C 280 198 300 202 314 210"
+          stroke="url(#frameGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+    <!-- Left heart lens -->
+    <path d="M 162 204 C 162 188 144 180 132 190 C 118 204 132 224 162 244
+             C 192 224 206 204 192 190 C 180 180 162 188 162 204 Z"
+          fill="url(#lensRose)" stroke="url(#frameGrad)" stroke-width="3.5"/>
+    <!-- Left lens shine -->
+    <path d="M 162 204 C 162 188 144 180 132 190 C 118 204 132 224 162 244
+             C 192 224 206 204 192 190 C 180 180 162 188 162 204 Z"
+          fill="url(#lensShine)"/>
+    <!-- Left lens highlight spot -->
+    <ellipse cx="148" cy="198" rx="10" ry="7" fill="rgba(255,255,255,0.2)" transform="rotate(-20 148 198)"/>
+    <ellipse cx="145" cy="195" rx="5" ry="3" fill="rgba(255,255,255,0.25)" transform="rotate(-20 145 195)"/>
+
+    <!-- Right heart lens -->
+    <path d="M 338 204 C 338 188 356 180 368 190 C 382 204 368 224 338 244
+             C 308 224 294 204 308 190 C 320 180 338 188 338 204 Z"
+          fill="url(#lensRose)" stroke="url(#frameGrad)" stroke-width="3.5"/>
+    <!-- Right lens shine -->
+    <path d="M 338 204 C 338 188 356 180 368 190 C 382 204 368 224 338 244
+             C 308 224 294 204 308 190 C 320 180 338 188 338 204 Z"
+          fill="url(#lensShine)"/>
+    <!-- Right lens highlight spot -->
+    <ellipse cx="324" cy="198" rx="10" ry="7" fill="rgba(255,255,255,0.2)" transform="rotate(20 324 198)"/>
+    <ellipse cx="321" cy="195" rx="5" ry="3" fill="rgba(255,255,255,0.25)" transform="rotate(20 321 195)"/>
+
+    <!-- Temple arms going to ears -->
+    <path d="M 126 200 C 118 196 108 196 100 200" stroke="url(#frameGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M 374 200 C 382 196 392 196 400 200" stroke="url(#frameGrad)" stroke-width="4" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- ====== NOSE / MUZZLE ====== -->
+  <!-- Muzzle bump -->
+  <ellipse cx="250" cy="300" rx="35" ry="22" fill="#3b2a1a" opacity="0.5"/>
+
+  <!-- Large moose nose -->
+  <ellipse cx="250" cy="308" rx="30" ry="20" fill="url(#noseGrad)"/>
+  <ellipse cx="250" cy="306" rx="28" ry="18" fill="#2d1f14"/>
   <!-- Nostrils -->
-  <ellipse cx="191" cy="261" rx="5" ry="4" fill="#1a0e0a"/>
-  <ellipse cx="209" cy="261" rx="5" ry="4" fill="#1a0e0a"/>
+  <ellipse cx="238" cy="310" rx="7" ry="6" fill="#1a0e08"/>
+  <ellipse cx="262" cy="310" rx="7" ry="6" fill="#1a0e08"/>
   <!-- Nose highlight -->
-  <ellipse cx="198" cy="256" rx="8" ry="4" fill="rgba(255,255,255,0.08)"/>
+  <ellipse cx="246" cy="300" rx="12" ry="5" fill="rgba(255,255,255,0.06)" transform="rotate(-5 246 300)"/>
 
-  <!-- Mouth / smirk -->
-  <path d="M 188 278 Q 194 284 200 283 Q 206 284 212 278"
-        stroke="#1a0e0a" stroke-width="2" fill="none" stroke-linecap="round"/>
-  <!-- Slight smirk on right side -->
-  <path d="M 212 278 Q 218 276 222 272"
-        stroke="#1a0e0a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- ====== MOUTH ====== -->
+  <path d="M 230 330 C 238 338 248 340 250 340 C 252 340 262 338 270 330"
+        stroke="#1a0e08" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <!-- Smirk on right side -->
+  <path d="M 270 330 C 278 326 284 320 288 314"
+        stroke="#1a0e08" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
 
-  <!-- Chin tuft / beard -->
-  <path d="M 185 300 Q 190 315 200 320 Q 210 315 215 300"
-        stroke="#4a3228" stroke-width="2" fill="#3e2723" opacity="0.6"/>
+  <!-- Dewlap / bell (the hanging chin thing moose have) -->
+  <path d="M 235 345 C 238 365 245 380 250 385 C 255 380 262 365 265 345"
+        fill="#3b2a1a" stroke="#2d1f14" stroke-width="1" opacity="0.7"/>
+  <path d="M 240 350 C 242 362 247 372 250 375 C 253 372 258 362 260 350"
+        fill="#4a3728" opacity="0.3"/>
 
-  <!-- Subtle fur texture lines on forehead -->
-  <path d="M 185 185 Q 190 178 200 176 Q 210 178 215 185" stroke="#4a3228" stroke-width="1" fill="none" opacity="0.4"/>
-  <path d="M 180 192 Q 190 186 200 184 Q 210 186 220 192" stroke="#4a3228" stroke-width="1" fill="none" opacity="0.3"/>
+  <!-- ====== WHISKER DOTS ====== -->
+  <circle cx="210" cy="295" r="1.5" fill="#2d1f14" opacity="0.4"/>
+  <circle cx="215" cy="302" r="1.5" fill="#2d1f14" opacity="0.4"/>
+  <circle cx="212" cy="310" r="1.5" fill="#2d1f14" opacity="0.3"/>
+  <circle cx="290" cy="295" r="1.5" fill="#2d1f14" opacity="0.4"/>
+  <circle cx="285" cy="302" r="1.5" fill="#2d1f14" opacity="0.4"/>
+  <circle cx="288" cy="310" r="1.5" fill="#2d1f14" opacity="0.3"/>
 
-  <!-- Purple accent glow at bottom -->
-  <ellipse cx="200" cy="340" rx="60" ry="8" fill="#8B5CF6" opacity="0.15"/>
-
-  <!-- Text -->
-  <text x="200" y="370" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" fill="#8B5CF6" letter-spacing="4">PROJECT MOOSE</text>
+  <!-- ====== TEXT ====== -->
+  <text x="250" y="445" text-anchor="middle" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="22" font-weight="bold" fill="#e8446a" letter-spacing="6" opacity="0.9">PROJECT MOOSE</text>
+  <text x="250" y="468" text-anchor="middle" font-family="'Segoe UI', Arial, Helvetica, sans-serif" font-size="11" fill="#8B5CF6" letter-spacing="3" opacity="0.6">VISUAL AGENT ORCHESTRATION</text>
 </svg>
