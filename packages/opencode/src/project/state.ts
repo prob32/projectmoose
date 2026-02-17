@@ -28,6 +28,13 @@ export namespace State {
     }
   }
 
+  /** Invalidate a specific cached state entry so it re-initializes on next access */
+  export function invalidate(key: string, init: any) {
+    const entries = recordsByKey.get(key)
+    if (!entries) return
+    entries.delete(init)
+  }
+
   export async function dispose(key: string) {
     const entries = recordsByKey.get(key)
     if (!entries) return

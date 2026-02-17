@@ -22,7 +22,7 @@ import type { DragEvent } from "@thisbeyond/solid-dnd"
 import { useSync } from "@/context/sync"
 import { useTerminal, type LocalPTY } from "@/context/terminal"
 import { useLayout } from "@/context/layout"
-import { checksum, base64Encode } from "@opencode-ai/util/encode"
+import { checksum } from "@opencode-ai/util/encode"
 import { findLast } from "@opencode-ai/util/array"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DialogSelectFile } from "@/components/dialog-select-file"
@@ -37,7 +37,7 @@ import { useComments } from "@/context/comments"
 import { ConstrainDragYAxis, getDraggableId } from "@/utils/solid-dnd"
 import { usePermission } from "@/context/permission"
 import { showToast } from "@opencode-ai/ui/toast"
-import { SessionHeader, SessionContextTab, SortableTab, FileVisual, NewSessionView } from "@/components/session"
+import { SessionHeader, SessionContextTab, SortableTab, FileVisual } from "@/components/session"
 import { navMark, navParams } from "@/utils/perf"
 import { same } from "@/utils/same"
 import { createOpenReviewFile, focusTerminalById, getTabReorderIndex } from "@/pages/session/helpers"
@@ -52,12 +52,13 @@ import {
 } from "@/pages/session/review-tab"
 import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { terminalTabLabel } from "@/pages/session/terminal-label"
-import { MessageTimeline } from "@/pages/session/message-timeline"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
 import { SessionPromptDock } from "@/pages/session/session-prompt-dock"
 import { SessionMobileTabs } from "@/pages/session/session-mobile-tabs"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
 import { useSessionHashScroll } from "@/pages/session/use-session-hash-scroll"
+import { AgentCanvas } from "@/components/canvas/agent-canvas"
+import { CanvasProvider } from "@/context/canvas"
 
 type HandoffSession = {
   prompt: string
@@ -1581,128 +1582,35 @@ export default function Page() {
             "--prompt-height": store.promptHeight ? `${store.promptHeight}px` : undefined,
           }}
         >
-          <div class="flex-1 min-h-0 overflow-hidden">
-            <Switch>
-              <Match when={params.id}>
-                <Show when={activeMessage()}>
-                  <MessageTimeline
-                    mobileChanges={mobileChanges()}
-                    mobileFallback={reviewContent({
-                      diffStyle: "unified",
-                      classes: {
-                        root: "pb-[calc(var(--prompt-height,8rem)+32px)]",
-                        header: "px-4",
-                        container: "px-4",
-                      },
-                      loadingClass: "px-4 py-4 text-text-weak",
-                      emptyClass: "h-full pb-30 flex flex-col items-center justify-center text-center gap-6",
-                    })}
-                    scroll={ui.scroll}
-                    onResumeScroll={resumeScroll}
-                    setScrollRef={setScrollRef}
-                    onScheduleScrollState={scheduleScrollState}
-                    onAutoScrollHandleScroll={autoScroll.handleScroll}
-                    onMarkScrollGesture={markScrollGesture}
-                    hasScrollGesture={hasScrollGesture}
-                    isDesktop={isDesktop()}
-                    onScrollSpyScroll={scrollSpy.onScroll}
-                    onAutoScrollInteraction={autoScroll.handleInteraction}
-                    showHeader={!!(info()?.title || info()?.parentID)}
-                    centered={centered()}
-                    title={info()?.title}
-                    parentID={info()?.parentID}
-                    openTitleEditor={openTitleEditor}
-                    closeTitleEditor={closeTitleEditor}
-                    saveTitleEditor={saveTitleEditor}
-                    titleRef={(el) => {
-                      titleRef = el
-                    }}
-                    titleState={title}
-                    onTitleDraft={(value) => setTitle("draft", value)}
-                    onTitleMenuOpen={(open) => setTitle("menuOpen", open)}
-                    onTitlePendingRename={(value) => setTitle("pendingRename", value)}
-                    onNavigateParent={() => {
-                      navigate(`/${params.dir}/session/${info()?.parentID}`)
-                    }}
-                    sessionID={params.id!}
-                    onArchiveSession={(sessionID) => void archiveSession(sessionID)}
-                    onDeleteSession={(sessionID) => dialog.show(() => <DialogDeleteSession sessionID={sessionID} />)}
-                    t={language.t as (key: string, vars?: Record<string, string | number | boolean>) => string}
-                    setContentRef={(el) => {
-                      content = el
-                      autoScroll.contentRef(el)
+          {/* CanvasProvider wraps both canvas and prompt dock so dock can access selected agent */}
+          <CanvasProvider>
+            {/* Canvas always renders as the workspace background */}
+            <div class="flex-1 min-h-0 overflow-hidden relative">
+              <AgentCanvas workspaceSessionID={params.dir ?? ""} />
+            </div>
 
-                      const root = scroller
-                      if (root) scheduleScrollState(root)
-                    }}
-                    turnStart={store.turnStart}
-                    onRenderEarlier={() => setStore("turnStart", 0)}
-                    historyMore={historyMore()}
-                    historyLoading={historyLoading()}
-                    onLoadEarlier={() => {
-                      const id = params.id
-                      if (!id) return
-                      setStore("turnStart", 0)
-                      sync.session.history.loadMore(id)
-                    }}
-                    renderedUserMessages={renderedUserMessages()}
-                    anchor={anchor}
-                    onRegisterMessage={scrollSpy.register}
-                    onUnregisterMessage={scrollSpy.unregister}
-                    onFirstTurnMount={() => {
-                      const id = params.id
-                      if (!id) return
-                      navMark({ dir: params.dir, to: id, name: "session:first-turn-mounted" })
-                    }}
-                    lastUserMessageID={lastUserMessage()?.id}
-                    expanded={store.expanded}
-                    onToggleExpanded={(id) => setStore("expanded", id, (open: boolean | undefined) => !open)}
-                  />
-                </Show>
-              </Match>
-              <Match when={true}>
-                <NewSessionView
-                  worktree={newSessionWorktree()}
-                  onWorktreeChange={(value) => {
-                    if (value === "create") {
-                      setStore("newSessionWorktree", value)
-                      return
-                    }
-
-                    setStore("newSessionWorktree", "main")
-
-                    const target = value === "main" ? sync.project?.worktree : value
-                    if (!target) return
-                    if (target === sdk.directory) return
-                    layout.projects.open(target)
-                    navigate(`/${base64Encode(target)}/session`)
-                  }}
-                />
-              </Match>
-            </Switch>
-          </div>
-
-          <SessionPromptDock
-            centered={centered()}
-            questionRequest={questionRequest}
-            permissionRequest={permRequest}
-            blocked={blocked()}
-            promptReady={prompt.ready()}
-            handoffPrompt={handoff.session.get(sessionKey())?.prompt}
-            t={language.t as (key: string, vars?: Record<string, string | number | boolean>) => string}
-            responding={ui.responding}
-            onDecide={decide}
-            inputRef={(el) => {
-              inputRef = el
-            }}
-            newSessionWorktree={newSessionWorktree()}
-            onNewSessionWorktreeReset={() => setStore("newSessionWorktree", "main")}
-            onSubmit={() => {
-              comments.clear()
-              resumeScroll()
-            }}
-            setPromptDockRef={(el) => (promptDock = el)}
-          />
+            <SessionPromptDock
+              centered={centered()}
+              questionRequest={questionRequest}
+              permissionRequest={permRequest}
+              blocked={blocked()}
+              promptReady={prompt.ready()}
+              handoffPrompt={handoff.session.get(sessionKey())?.prompt}
+              t={language.t as (key: string, vars?: Record<string, string | number | boolean>) => string}
+              responding={ui.responding}
+              onDecide={decide}
+              inputRef={(el) => {
+                inputRef = el
+              }}
+              newSessionWorktree={newSessionWorktree()}
+              onNewSessionWorktreeReset={() => setStore("newSessionWorktree", "main")}
+              onSubmit={() => {
+                comments.clear()
+                resumeScroll()
+              }}
+              setPromptDockRef={(el) => (promptDock = el)}
+            />
+          </CanvasProvider>
 
           <Show when={desktopReviewOpen()}>
             <ResizeHandle

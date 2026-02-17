@@ -55,6 +55,7 @@ import { navStart } from "@/utils/perf"
 import { DialogSelectDirectory } from "@/components/dialog-select-directory"
 import { DialogEditProject } from "@/components/dialog-edit-project"
 import { Titlebar } from "@/components/titlebar"
+import { SidebarAgents } from "@/components/sidebar-agents"
 import { useServer } from "@/context/server"
 import { useLanguage, type Locale } from "@/context/language"
 import {
@@ -1969,13 +1970,28 @@ export default function Layout(props: ParentProps) {
               onOpenSettings={openSettings}
               helpLabel={() => language.t("sidebar.help")}
               onOpenHelp={() => platform.openLink("https://opencode.ai/desktop-feedback")}
-              renderPanel={() => <SidebarPanel project={currentProject()} />}
+              renderPanel={() => (
+                <div
+                  class="flex flex-col min-h-0 bg-background-stronger border border-b-0 border-border-weak-base rounded-tl-sm"
+                  style={{ width: `${Math.max(layout.sidebar.width() - 64, 0)}px` }}
+                >
+                  <SidebarAgents
+                    directory={currentDir()}
+                    workspaceSessionID={params.dir ?? ""}
+                  />
+                </div>
+              )}
             />
           </div>
           <Show when={!layout.sidebar.opened() ? hoverProjectData()?.worktree : undefined} keyed>
             {(worktree) => (
               <div class="absolute inset-y-0 left-16 z-50 flex" onMouseEnter={aim.reset}>
-                <SidebarPanel project={hoverProjectData()} />
+                <div class="flex flex-col min-h-0 bg-background-stronger border border-b-0 border-border-weak-base rounded-tl-sm" style={{ width: `${Math.max(layout.sidebar.width() - 64, 0)}px` }}>
+                  <SidebarAgents
+                    directory={currentDir()}
+                    workspaceSessionID={params.dir ?? ""}
+                  />
+                </div>
               </div>
             )}
           </Show>
@@ -2034,7 +2050,14 @@ export default function Layout(props: ParentProps) {
               onOpenSettings={openSettings}
               helpLabel={() => language.t("sidebar.help")}
               onOpenHelp={() => platform.openLink("https://opencode.ai/desktop-feedback")}
-              renderPanel={() => <SidebarPanel project={currentProject()} mobile />}
+              renderPanel={() => (
+                <div class="flex flex-col min-h-0 bg-background-stronger border border-b-0 border-border-weak-base rounded-tl-sm flex-1 min-w-0">
+                  <SidebarAgents
+                    directory={currentDir()}
+                    workspaceSessionID={params.dir ?? ""}
+                  />
+                </div>
+              )}
             />
           </nav>
         </div>

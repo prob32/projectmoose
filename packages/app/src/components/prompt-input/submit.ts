@@ -40,6 +40,10 @@ type PromptSubmitInput = {
   newSessionWorktree?: Accessor<string | undefined>
   onNewSessionWorktreeReset?: () => void
   onSubmit?: () => void
+  /** When set, messages route to this agent session instead of the URL session */
+  agentSessionID?: Accessor<string | undefined>
+  /** Override model + agent for Moose agent sessions so the correct model/prompt is used server-side */
+  agentOverride?: Accessor<{ agentName: string; model: { providerID: string; modelID: string } } | undefined>
 }
 
 type CommentItem = {
@@ -183,7 +187,10 @@ export function createPromptSubmit(input: PromptSubmitInput) {
       input.onNewSessionWorktreeReset?.()
     }
 
-    let session = input.info()
+    // If an agent is selected on the canvas, route to its session
+    const agentSID = input.agentSessionID?.()
+    let session: { id: string } | undefined = agentSID ? { id: agentSID } : input.info()
+
     if (!session && isNewSession) {
       session = await client.session
         .create()
@@ -210,12 +217,14 @@ export function createPromptSubmit(input: PromptSubmitInput) {
 
     input.onSubmit?.()
 
-    const model = {
-      modelID: currentModel.id,
-      providerID: currentModel.provider.id,
-    }
-    const agent = currentAgent.name
-    const variant = local.model.variant.current()
+    // When sending to a Moose agent session, use the agent's configured model
+    // and agent name so the server resolves the correct system prompt and LLM.
+    const override = agentSID ? input.agentOverride?.() : undefined
+    const model = override
+      ? { modelID: override.model.modelID, providerID: override.model.providerID }
+      : { modelID: currentModel.id, providerID: currentModel.provider.id }
+    const agent = override ? override.agentName : currentAgent.name
+    const variant = override ? undefined : local.model.variant.current()
 
     const clearInput = () => {
       prompt.reset()

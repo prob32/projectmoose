@@ -234,6 +234,20 @@ export const useSessionCommands = (input: SessionCommandContext) => {
       keybind: "shift+mod+.",
       onSelect: () => input.local.agent.move(-1),
     }),
+    agentCommand({
+      id: "agent.spawn",
+      title: "Spawn Agent",
+      description: "Spawn a child agent",
+      slash: "spawn",
+      onSelect: () => window.dispatchEvent(new CustomEvent("moose:spawn-request")),
+    }),
+    agentCommand({
+      id: "agent.task",
+      title: "Assign Task",
+      description: "Assign a task to a child agent",
+      slash: "task",
+      onSelect: () => window.dispatchEvent(new CustomEvent("moose:task-request")),
+    }),
     modelCommand({
       id: "model.variant.cycle",
       title: input.language.t("command.model.variant.cycle"),

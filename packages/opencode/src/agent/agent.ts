@@ -4,6 +4,7 @@ import { Provider } from "../provider/provider"
 import { generateObject, streamObject, type ModelMessage } from "ai"
 import { SystemPrompt } from "../session/system"
 import { Instance } from "../project/instance"
+import { State } from "../project/state"
 import { Truncate } from "../tool/truncation"
 import { Auth } from "../auth"
 import { ProviderTransform } from "../provider/transform"
@@ -14,6 +15,7 @@ import PROMPT_EXPLORE from "./prompt/explore.txt"
 import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { PermissionNext } from "@/permission/next"
+import { MooseAgentDefinition } from "./moose/definition"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@/global"
 import path from "path"
@@ -48,7 +50,7 @@ export namespace Agent {
     })
   export type Info = z.infer<typeof Info>
 
-  const state = Instance.state(async () => {
+  const stateInit = async () => {
     const cfg = await Config.get()
 
     const skillDirs = await Skill.dirs()
@@ -230,6 +232,63 @@ export namespace Agent {
       item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
     }
 
+    // Register Moose agent definitions as OpenCode subagents
+    // This makes them spawnable via TaskTool and the full session execution pipeline
+    try {
+      const mooseDefs = await MooseAgentDefinition.list()
+      for (const def of mooseDefs) {
+        // Don't override user-configured or built-in agents
+        if (result[def.id]) continue
+
+        // Build MCP-scoped permissions from the definition's mcp config
+        const mcpPerms: Record<string, string | Record<string, string>> = {}
+        if (def.mcp?.deny) {
+          for (const denied of def.mcp.deny) {
+            mcpPerms[denied] = "deny"
+          }
+        }
+
+        // Orchestrators (agents with spawnable config) get the full tool suite:
+        // task, question, plan, and todo tools. Leaf agents keep defaults.
+        const isOrchestrator = !!(def.spawnable?.agents?.length)
+        const orchestratorPerms: Record<string, string> = isOrchestrator
+          ? {
+              task: "allow",
+              question: "allow",
+              plan_enter: "allow",
+              plan_exit: "allow",
+              todoread: "allow",
+              todowrite: "allow",
+            }
+          : {
+              todoread: "deny",
+              todowrite: "deny",
+            }
+
+        result[def.id] = {
+          name: def.id,
+          description: def.description ?? `Moose agent: ${def.name}`,
+          mode: "subagent",
+          prompt: def.prompt,
+          model: def.model,
+          temperature: def.temperature,
+          color: def.color,
+          permission: PermissionNext.merge(
+            defaults,
+            PermissionNext.fromConfig({
+              ...orchestratorPerms,
+              ...mcpPerms,
+            }),
+            user,
+          ),
+          options: {},
+          native: false,
+        }
+      }
+    } catch {
+      // Moose definitions may not be available yet during early bootstrap
+    }
+
     // Ensure Truncate.GLOB is allowed unless explicitly configured
     for (const name in result) {
       const agent = result[name]
@@ -247,7 +306,13 @@ export namespace Agent {
     }
 
     return result
-  })
+  }
+  const state = Instance.state(stateInit)
+
+  /** Invalidate the agent cache so new/updated Moose definitions are picked up */
+  export function invalidateCache() {
+    State.invalidate(Instance.directory, stateInit)
+  }
 
   export async function get(agent: string) {
     return state().then((x) => x[agent])

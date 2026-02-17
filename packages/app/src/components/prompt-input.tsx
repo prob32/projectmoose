@@ -58,6 +58,12 @@ interface PromptInputProps {
   newSessionWorktree?: string
   onNewSessionWorktreeReset?: () => void
   onSubmit?: () => void
+  /** When set, messages route to this agent session instead of the URL session */
+  agentSessionID?: () => string | undefined
+  /** Read-only model label for Moose agent sessions (providerID/modelID) */
+  agentModelLabel?: () => { providerID: string; modelID: string } | undefined
+  /** Override model + agent for Moose agent sessions so the correct model/prompt is used server-side */
+  agentOverride?: () => { agentName: string; model: { providerID: string; modelID: string } } | undefined
 }
 
 const EXAMPLES = [
@@ -812,6 +818,8 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
     newSessionWorktree: () => props.newSessionWorktree,
     onNewSessionWorktreeReset: props.onNewSessionWorktreeReset,
     onSubmit: props.onSubmit,
+    agentSessionID: props.agentSessionID,
+    agentOverride: props.agentOverride,
   })
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1032,83 +1040,65 @@ export const PromptInput: Component<PromptInputProps> = (props) => {
                 </div>
               </Match>
               <Match when={store.mode === "normal"}>
-                <TooltipKeybind
-                  placement="top"
-                  gutter={8}
-                  title={language.t("command.agent.cycle")}
-                  keybind={command.keybind("agent.cycle")}
-                >
-                  <Select
-                    options={agentNames()}
-                    current={local.agent.current()?.name ?? ""}
-                    onSelect={local.agent.set}
-                    class={`capitalize ${local.model.variant.list().length > 0 ? "max-w-full" : "max-w-[120px]"}`}
-                    valueClass="truncate"
-                    variant="ghost"
-                  />
-                </TooltipKeybind>
                 <Show
-                  when={providers.paid().length > 0}
+                  when={props.agentModelLabel?.()}
                   fallback={
-                    <TooltipKeybind
-                      placement="top"
-                      gutter={8}
-                      title={language.t("command.model.choose")}
-                      keybind={command.keybind("model.choose")}
+                    <Show
+                      when={providers.paid().length > 0}
+                      fallback={
+                        <TooltipKeybind
+                          placement="top"
+                          gutter={8}
+                          title={language.t("command.model.choose")}
+                          keybind={command.keybind("model.choose")}
+                        >
+                          <Button
+                            as="div"
+                            variant="ghost"
+                            class="px-2 min-w-0 max-w-[240px]"
+                            onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
+                          >
+                            <Show when={local.model.current()?.provider?.id}>
+                              <ProviderIcon id={local.model.current()!.provider.id as IconName} class="size-4 shrink-0" />
+                            </Show>
+                            <span class="truncate">
+                              {local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                            </span>
+                            <Icon name="chevron-down" size="small" class="shrink-0" />
+                          </Button>
+                        </TooltipKeybind>
+                      }
                     >
-                      <Button
-                        as="div"
-                        variant="ghost"
-                        class="px-2 min-w-0 max-w-[240px]"
-                        onClick={() => dialog.show(() => <DialogSelectModelUnpaid />)}
+                      <TooltipKeybind
+                        placement="top"
+                        gutter={8}
+                        title={language.t("command.model.choose")}
+                        keybind={command.keybind("model.choose")}
                       >
-                        <Show when={local.model.current()?.provider?.id}>
-                          <ProviderIcon id={local.model.current()!.provider.id as IconName} class="size-4 shrink-0" />
-                        </Show>
-                        <span class="truncate">
-                          {local.model.current()?.name ?? language.t("dialog.model.select.title")}
-                        </span>
-                        <Icon name="chevron-down" size="small" class="shrink-0" />
-                      </Button>
-                    </TooltipKeybind>
+                        <ModelSelectorPopover
+                          triggerAs={Button}
+                          triggerProps={{ variant: "ghost", class: "min-w-0 max-w-[240px]" }}
+                        >
+                          <Show when={local.model.current()?.provider?.id}>
+                            <ProviderIcon id={local.model.current()!.provider.id as IconName} class="size-4 shrink-0" />
+                          </Show>
+                          <span class="truncate">
+                            {local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                          </span>
+                          <Icon name="chevron-down" size="small" class="shrink-0" />
+                        </ModelSelectorPopover>
+                      </TooltipKeybind>
+                    </Show>
                   }
                 >
-                  <TooltipKeybind
-                    placement="top"
-                    gutter={8}
-                    title={language.t("command.model.choose")}
-                    keybind={command.keybind("model.choose")}
-                  >
-                    <ModelSelectorPopover
-                      triggerAs={Button}
-                      triggerProps={{ variant: "ghost", class: "min-w-0 max-w-[240px]" }}
-                    >
-                      <Show when={local.model.current()?.provider?.id}>
-                        <ProviderIcon id={local.model.current()!.provider.id as IconName} class="size-4 shrink-0" />
-                      </Show>
-                      <span class="truncate">
-                        {local.model.current()?.name ?? language.t("dialog.model.select.title")}
+                  {(agentModel) => (
+                    <div class="flex items-center gap-1.5 px-2 h-6 min-w-0 max-w-[240px]">
+                      <ProviderIcon id={agentModel().providerID as IconName} class="size-4 shrink-0" />
+                      <span class="text-12-regular text-text-secondary truncate">
+                        {agentModel().modelID}
                       </span>
-                      <Icon name="chevron-down" size="small" class="shrink-0" />
-                    </ModelSelectorPopover>
-                  </TooltipKeybind>
-                </Show>
-                <Show when={local.model.variant.list().length > 0}>
-                  <TooltipKeybind
-                    placement="top"
-                    gutter={8}
-                    title={language.t("command.model.variant.cycle")}
-                    keybind={command.keybind("model.variant.cycle")}
-                  >
-                    <Button
-                      data-action="model-variant-cycle"
-                      variant="ghost"
-                      class="text-text-base _hidden group-hover/prompt-input:inline-block capitalize text-12-regular"
-                      onClick={() => local.model.variant.cycle()}
-                    >
-                      {local.model.variant.current() ?? language.t("common.default")}
-                    </Button>
-                  </TooltipKeybind>
+                    </div>
+                  )}
                 </Show>
                 <Show when={permission.permissionsEnabled() && params.id}>
                   <TooltipKeybind

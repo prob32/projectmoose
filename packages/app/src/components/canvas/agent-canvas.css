@@ -1,0 +1,805 @@
+/* ================================================================
+   Agent Canvas Styles — LM Studio–Inspired Dark Theme
+   Deep purple/navy palette with vibrant accent colors,
+   glass-morphism overlays, and smooth micro-animations.
+   ================================================================ */
+
+/* ===== Canvas Variables ===== */
+:root {
+  --canvas-bg: #0f0d1a;
+  --canvas-grid: rgba(139, 92, 246, 0.08);
+  --canvas-surface: rgba(22, 18, 36, 0.92);
+  --canvas-surface-hover: rgba(34, 28, 52, 0.95);
+  --canvas-border: rgba(139, 92, 246, 0.15);
+  --canvas-border-strong: rgba(139, 92, 246, 0.3);
+  --canvas-text: #e2dff0;
+  --canvas-text-dim: #8b87a0;
+  --canvas-text-bright: #f8f7fc;
+  --canvas-accent: #8b5cf6;
+  --canvas-glow: rgba(139, 92, 246, 0.25);
+  --canvas-success: #22c55e;
+  --canvas-warning: #f59e0b;
+  --canvas-error: #ef4444;
+  --canvas-info: #3b82f6;
+}
+
+/* ===== Canvas Background ===== */
+
+.agent-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--canvas-bg);
+  background-image:
+    radial-gradient(circle, var(--canvas-grid) 1px, transparent 1px),
+    radial-gradient(ellipse at 20% 50%, rgba(139, 92, 246, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
+  background-size: 24px 24px, 100% 100%, 100% 100%;
+  cursor: default;
+  user-select: none;
+}
+
+/* ===== Agent Node ===== */
+
+.agent-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: grab;
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.agent-node:active {
+  cursor: grabbing;
+}
+
+.agent-node:hover {
+  filter: brightness(1.08);
+}
+
+.agent-node.selected {
+  filter: brightness(1.15);
+}
+
+.agent-node-circle {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(22, 18, 36, 0.95), rgba(30, 25, 48, 0.98));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(139, 92, 246, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border: 2.5px solid var(--agent-color, var(--canvas-border-strong));
+  transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
+}
+
+.agent-node:hover .agent-node-circle {
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.5),
+    0 0 20px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 20%, transparent),
+    0 0 0 1px rgba(139, 92, 246, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.agent-node.selected .agent-node-circle {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 40%, transparent),
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    0 0 30px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 15%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-color: var(--agent-color, var(--canvas-accent));
+}
+
+/* ===== Context Usage Ring ===== */
+
+.agent-context-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== Node Label ===== */
+
+.agent-node-label {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--canvas-text);
+  text-align: center;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* ===== Role Badge (below name) ===== */
+
+.agent-node-role {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--canvas-text-dim);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* ===== State Indicator Badge ===== */
+
+.agent-state-badge {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  border: 2.5px solid var(--canvas-bg);
+  z-index: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.agent-state-badge.idle {
+  background: var(--canvas-success);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.agent-state-badge.working {
+  background: var(--canvas-warning);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.agent-state-badge.error {
+  background: var(--canvas-error);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.agent-state-badge.question {
+  background: var(--canvas-info);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.agent-state-badge.spawning {
+  background: var(--canvas-accent);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== Error Badge — Red "!" above-right of agent icon ===== */
+
+.agent-error-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--canvas-error);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--canvas-bg);
+  z-index: 2;
+  box-shadow:
+    0 0 8px rgba(239, 68, 68, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+  animation: error-badge-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes error-badge-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 8px rgba(239, 68, 68, 0.5),
+      0 2px 6px rgba(0, 0, 0, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(239, 68, 68, 0.7),
+      0 0 0 4px rgba(239, 68, 68, 0.15),
+      0 2px 6px rgba(0, 0, 0, 0.4);
+    transform: scale(1.1);
+  }
+}
+
+/* ===== Todo Progress Badge — Top-left of agent icon ===== */
+
+.agent-todo-badge {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  min-width: 24px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: rgba(139, 92, 246, 0.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--canvas-bg);
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.02em;
+}
+
+.agent-todo-badge.todo-done {
+  background: var(--canvas-success);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ===== Working Animation: Glow Pulse + Subtle Breathe ===== */
+
+.agent-node.state-working .agent-node-circle {
+  animation:
+    agent-working-glow 2s ease-in-out infinite,
+    agent-working-breathe 3s ease-in-out infinite;
+}
+
+@keyframes agent-working-glow {
+  0%, 100% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 20px color-mix(in srgb, var(--agent-color, #f59e0b) 15%, transparent),
+      0 0 0 1px rgba(139, 92, 246, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  50% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 40px color-mix(in srgb, var(--agent-color, #f59e0b) 30%, transparent),
+      0 0 0 1px color-mix(in srgb, var(--agent-color, #f59e0b) 30%, transparent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+}
+
+@keyframes agent-working-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+/* ===== Error Animation: Red Pulse ===== */
+
+.agent-node.state-error .agent-node-circle {
+  animation: agent-error-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes agent-error-pulse {
+  0%, 100% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 0 0 rgba(239, 68, 68, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-color: var(--agent-color, #ef4444);
+  }
+  50% {
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 0 10px rgba(239, 68, 68, 0),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    border-color: #ef4444;
+  }
+}
+
+/* ===== Question Animation: Gentle Float ===== */
+
+.agent-node.state-question .agent-node-circle {
+  animation: agent-question-float 2.5s ease-in-out infinite;
+}
+
+@keyframes agent-question-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* ===== Spawning Animation: Liquid Morphing Emergence ===== */
+/* Applied to newly created nodes via .spawn-enter, and parent flash via .state-spawning */
+
+.agent-node.spawn-enter,
+.agent-node.state-spawning {
+  animation: agent-spawn-liquid 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.agent-node.spawn-enter .agent-node-circle,
+.agent-node.state-spawning .agent-node-circle {
+  animation: agent-spawn-morph 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Liquid ripple rings that expand outward during spawn */
+.agent-node.spawn-enter .agent-node-circle::before,
+.agent-node.state-spawning .agent-node-circle::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--agent-color, var(--canvas-accent));
+  opacity: 0;
+  animation: agent-spawn-ripple 2s 0.2s ease-out forwards;
+  pointer-events: none;
+}
+
+.agent-node.spawn-enter .agent-node-circle::after,
+.agent-node.state-spawning .agent-node-circle::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--agent-color, var(--canvas-accent));
+  opacity: 0;
+  animation: agent-spawn-ripple 2s 0.5s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes agent-spawn-liquid {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+    filter: blur(10px) brightness(2);
+  }
+  12% {
+    transform: scale(0.3);
+    opacity: 0.4;
+    filter: blur(6px) brightness(1.7);
+  }
+  30% {
+    transform: scale(0.7);
+    opacity: 0.85;
+    filter: blur(2px) brightness(1.4);
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+    filter: blur(0px) brightness(1.2);
+  }
+  70% {
+    transform: scale(0.97);
+    filter: brightness(1.08);
+  }
+  85% {
+    transform: scale(1.02);
+    filter: brightness(1.03);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    filter: brightness(1) blur(0px);
+  }
+}
+
+@keyframes agent-spawn-morph {
+  0% {
+    border-radius: 35% 65% 60% 40% / 40% 35% 65% 60%;
+    box-shadow:
+      0 0 35px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 50%, transparent),
+      inset 0 0 16px rgba(255, 255, 255, 0.15);
+  }
+  15% {
+    border-radius: 55% 45% 40% 60% / 55% 40% 60% 45%;
+    box-shadow:
+      0 0 30px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 40%, transparent),
+      inset 0 0 12px rgba(255, 255, 255, 0.1);
+  }
+  35% {
+    border-radius: 45% 55% 55% 45% / 50% 55% 45% 50%;
+    box-shadow:
+      0 0 22px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 30%, transparent),
+      inset 0 0 8px rgba(255, 255, 255, 0.06);
+  }
+  55% {
+    border-radius: 52% 48% 47% 53% / 48% 50% 50% 52%;
+    box-shadow:
+      0 0 14px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 20%, transparent),
+      inset 0 0 4px rgba(255, 255, 255, 0.03);
+  }
+  75% {
+    border-radius: 50% 50% 49% 51% / 49% 51% 50% 50%;
+  }
+  100% {
+    border-radius: 50%;
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.4),
+      0 0 0 1px rgba(139, 92, 246, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+}
+
+@keyframes agent-spawn-ripple {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  40% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* ===== GC Warning Animation ===== */
+
+.agent-node.gc-warning .agent-node-circle {
+  animation: agent-gc-warning 1s ease-in-out infinite;
+}
+
+@keyframes agent-gc-warning {
+  0%, 100% {
+    border-color: var(--agent-color);
+    opacity: 1;
+  }
+  50% {
+    border-color: #6b6780;
+    opacity: 0.35;
+  }
+}
+
+/* ===== Deletion Fade-Out ===== */
+
+.agent-node.deleting {
+  animation: agent-fade-out 0.4s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes agent-fade-out {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+/* ===== Task Complete: Green Glow on Node ===== */
+
+.agent-node.task-complete .agent-node-circle {
+  animation: agent-complete-glow 2s ease-out forwards;
+}
+
+@keyframes agent-complete-glow {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(34, 197, 94, 0.6),
+      0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  30% {
+    box-shadow:
+      0 0 0 12px rgba(34, 197, 94, 0.2),
+      0 0 40px rgba(34, 197, 94, 0.2),
+      0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(34, 197, 94, 0),
+      0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ================================================================
+   Connection Lines
+   ================================================================ */
+
+.agent-connection line {
+  stroke: rgba(139, 92, 246, 0.2);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  transition: stroke 0.3s ease, stroke-width 0.3s ease;
+}
+
+.agent-connection line.active {
+  stroke: color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 60%, transparent);
+  stroke-dasharray: none;
+  stroke-width: 2;
+}
+
+.agent-connection circle.connection-dot {
+  fill: rgba(139, 92, 246, 0.3);
+  transition: fill 0.3s ease;
+}
+
+.agent-connection circle.connection-dot.active {
+  fill: var(--agent-color, var(--canvas-accent));
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 40%, transparent));
+}
+
+/* Connection line pulsing when messages are active */
+.agent-connection line.pulsing {
+  stroke: var(--agent-color, var(--canvas-accent));
+  stroke-dasharray: none;
+  stroke-width: 2;
+  animation: connection-pulse 1s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--agent-color, var(--canvas-accent)) 30%, transparent));
+}
+
+@keyframes connection-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Message pulse dot traveling along the connection */
+.agent-connection .message-pulse {
+  fill: var(--agent-color, #8b5cf6);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 6px var(--agent-color, #8b5cf6));
+}
+
+.agent-connection .message-pulse.question {
+  fill: #FFC107;
+  filter: drop-shadow(0 0 6px #FFC107);
+}
+
+.agent-connection .message-pulse.scope_request {
+  fill: #FF6B35;
+  filter: drop-shadow(0 0 6px #FF6B35);
+}
+
+.agent-connection .message-pulse.answer {
+  fill: #22c55e;
+  filter: drop-shadow(0 0 6px #22c55e);
+}
+
+.agent-connection .message-pulse.result {
+  fill: #3b82f6;
+  filter: drop-shadow(0 0 6px #3b82f6);
+}
+
+/* ===== Task Complete: Green Flash on Connection ===== */
+
+.agent-connection line.task-complete {
+  stroke: #22c55e;
+  stroke-width: 3;
+  stroke-dasharray: none;
+  animation: connection-complete-flash 1.5s ease-out forwards;
+  filter: drop-shadow(0 0 8px rgba(34, 197, 94, 0.4));
+}
+
+@keyframes connection-complete-flash {
+  0% {
+    stroke: #22c55e;
+    stroke-width: 4;
+    opacity: 1;
+  }
+  100% {
+    stroke: rgba(139, 92, 246, 0.2);
+    stroke-width: 1.5;
+    opacity: 0.6;
+  }
+}
+
+/* ===== Instruction Sent: Animated Dashes ===== */
+
+.agent-connection line.instruction-sent {
+  stroke: #FF6B35;
+  stroke-dasharray: 8 4;
+  stroke-width: 2.5;
+  animation: instruction-dash 0.8s linear infinite;
+  filter: drop-shadow(0 0 4px rgba(255, 107, 53, 0.3));
+}
+
+@keyframes instruction-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* ================================================================
+   Context Menu — Glass-morphism style
+   ================================================================ */
+
+.canvas-context-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 200px;
+  background: rgba(22, 18, 36, 0.95);
+  backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(139, 92, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.canvas-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--canvas-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.canvas-context-menu-item:hover {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--canvas-text-bright);
+}
+
+.canvas-context-menu-item .agent-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dot-color, #888) 40%, transparent);
+}
+
+.canvas-context-menu-divider {
+  height: 1px;
+  background: rgba(139, 92, 246, 0.12);
+  margin: 4px 6px;
+}
+
+/* ================================================================
+   Empty Canvas State
+   ================================================================ */
+
+.canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  pointer-events: none;
+  color: var(--canvas-text-dim);
+}
+
+.canvas-empty-icon {
+  font-size: 56px;
+  opacity: 0.25;
+  filter: grayscale(0.5);
+}
+
+.canvas-empty-text {
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.4;
+  letter-spacing: 0.02em;
+}
+
+.canvas-empty-hint {
+  font-size: 12px;
+  opacity: 0.25;
+  letter-spacing: 0.01em;
+}
+
+/* ================================================================
+   Active Instances Overlay — Floating glass panel
+   ================================================================ */
+
+.instances-overlay {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 220px;
+  max-height: 40vh;
+  overflow-y: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(15, 13, 26, 0.88);
+  backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(139, 92, 246, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  z-index: 40;
+}
+
+.instances-overlay-header {
+  padding: 10px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--canvas-text-dim);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.instances-overlay-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.instances-overlay-item:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.instances-overlay-item.selected {
+  background: rgba(139, 92, 246, 0.15);
+}
+
+.instances-overlay-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--dot-color, #888) 50%, transparent);
+}
+
+.instances-overlay-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--canvas-text);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instances-overlay-state {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.instances-overlay-state.idle { color: var(--canvas-text-dim); }
+.instances-overlay-state.working { color: var(--canvas-warning); }
+.instances-overlay-state.error { color: var(--canvas-error); }
+.instances-overlay-state.question { color: var(--canvas-info); }
+.instances-overlay-state.spawning { color: var(--canvas-accent); }
+
+/* ================================================================
+   Scrollbar styling for overlays
+   ================================================================ */
+
+.instances-overlay::-webkit-scrollbar {
+  width: 4px;
+}
+
+.instances-overlay::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.instances-overlay::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 2px;
+}
+
+.instances-overlay::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.35);
+}
