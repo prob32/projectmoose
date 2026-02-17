@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="100%" style="stop-color:#16213e"/>
+    </linearGradient>
+    <linearGradient id="antlerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#c9a55a"/>
+      <stop offset="100%" style="stop-color:#8B6914"/>
+    </linearGradient>
+    <linearGradient id="furGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5c3d2e"/>
+      <stop offset="100%" style="stop-color:#3e2723"/>
+    </linearGradient>
+    <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6"/>
+      <stop offset="40%" style="stop-color:#6d28d9"/>
+      <stop offset="100%" style="stop-color:#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:rgba(255,255,255,0.3)"/>
+      <stop offset="100%" style="stop-color:rgba(255,255,255,0)"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="200" cy="200" r="190" fill="url(#bg)" stroke="#8B5CF6" stroke-width="3" opacity="0.95"/>
+  <circle cx="200" cy="200" r="186" fill="none" stroke="#8B5CF6" stroke-width="0.5" opacity="0.3"/>
+
+  <!-- Left antler -->
+  <g filter="url(#shadow)">
+    <!-- Main beam left -->
+    <path d="M 168 165 Q 155 130 130 95 Q 120 78 105 70"
+          stroke="url(#antlerGrad)" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <!-- Tine 1 left -->
+    <path d="M 148 128 Q 130 115 115 100"
+          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <!-- Tine 2 left -->
+    <path d="M 138 108 Q 125 95 108 88"
+          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <!-- Palm/top left -->
+    <path d="M 130 95 Q 118 80 100 72 Q 92 68 80 72"
+          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 105 70 Q 95 55 78 50"
+          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M 105 70 Q 100 60 92 52"
+          stroke="url(#antlerGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Right antler -->
+  <g filter="url(#shadow)">
+    <path d="M 232 165 Q 245 130 270 95 Q 280 78 295 70"
+          stroke="url(#antlerGrad)" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <path d="M 252 128 Q 270 115 285 100"
+          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 262 108 Q 275 95 292 88"
+          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M 270 95 Q 282 80 300 72 Q 308 68 320 72"
+          stroke="url(#antlerGrad)" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M 295 70 Q 305 55 322 50"
+          stroke="url(#antlerGrad)" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M 295 70 Q 300 60 308 52"
+          stroke="url(#antlerGrad)" stroke-width="5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Ears -->
+  <ellipse cx="148" cy="172" rx="18" ry="12" transform="rotate(-30 148 172)" fill="#5c3d2e" stroke="#3e2723" stroke-width="1.5"/>
+  <ellipse cx="148" cy="172" rx="12" ry="7" transform="rotate(-30 148 172)" fill="#8d6e63"/>
+  <ellipse cx="252" cy="172" rx="18" ry="12" transform="rotate(30 252 172)" fill="#5c3d2e" stroke="#3e2723" stroke-width="1.5"/>
+  <ellipse cx="252" cy="172" rx="12" ry="7" transform="rotate(30 252 172)" fill="#8d6e63"/>
+
+  <!-- Head shape -->
+  <g filter="url(#shadow)">
+    <path d="M 155 180
+             Q 150 200 152 230
+             Q 155 260 165 280
+             Q 175 300 185 310
+             Q 195 318 200 320
+             Q 205 318 215 310
+             Q 225 300 235 280
+             Q 245 260 248 230
+             Q 250 200 245 180
+             Q 235 160 200 155
+             Q 165 160 155 180 Z"
+          fill="url(#furGrad)"/>
+  </g>
+
+  <!-- Lighter face area -->
+  <path d="M 170 200
+           Q 168 225 172 250
+           Q 180 275 190 290
+           Q 195 296 200 298
+           Q 205 296 210 290
+           Q 220 275 228 250
+           Q 232 225 230 200
+           Q 225 185 200 182
+           Q 175 185 170 200 Z"
+        fill="#6d4c41" opacity="0.7"/>
+
+  <!-- Sunglasses -->
+  <g filter="url(#glow)">
+    <!-- Bridge -->
+    <path d="M 183 210 Q 200 205 217 210" stroke="#1a1a1a" stroke-width="4" fill="none"/>
+
+    <!-- Left lens -->
+    <ellipse cx="170" cy="212" rx="26" ry="20" fill="url(#glassGrad)" stroke="#1a1a1a" stroke-width="3"/>
+    <ellipse cx="170" cy="212" rx="26" ry="20" fill="url(#glassShine)"/>
+    <!-- Lens reflection -->
+    <ellipse cx="162" cy="206" rx="10" ry="6" fill="rgba(255,255,255,0.15)" transform="rotate(-15 162 206)"/>
+
+    <!-- Right lens -->
+    <ellipse cx="230" cy="212" rx="26" ry="20" fill="url(#glassGrad)" stroke="#1a1a1a" stroke-width="3"/>
+    <ellipse cx="230" cy="212" rx="26" ry="20" fill="url(#glassShine)"/>
+    <!-- Lens reflection -->
+    <ellipse cx="222" cy="206" rx="10" ry="6" fill="rgba(255,255,255,0.15)" transform="rotate(-15 222 206)"/>
+
+    <!-- Temple arms -->
+    <path d="M 144 210 Q 135 208 130 210" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M 256 210 Q 265 208 270 210" stroke="#1a1a1a" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- Nose/muzzle -->
+  <ellipse cx="200" cy="262" rx="22" ry="15" fill="#2d1b14"/>
+  <ellipse cx="200" cy="260" rx="20" ry="13" fill="#3e2723"/>
+  <!-- Nostrils -->
+  <ellipse cx="191" cy="261" rx="5" ry="4" fill="#1a0e0a"/>
+  <ellipse cx="209" cy="261" rx="5" ry="4" fill="#1a0e0a"/>
+  <!-- Nose highlight -->
+  <ellipse cx="198" cy="256" rx="8" ry="4" fill="rgba(255,255,255,0.08)"/>
+
+  <!-- Mouth / smirk -->
+  <path d="M 188 278 Q 194 284 200 283 Q 206 284 212 278"
+        stroke="#1a0e0a" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Slight smirk on right side -->
+  <path d="M 212 278 Q 218 276 222 272"
+        stroke="#1a0e0a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+  <!-- Chin tuft / beard -->
+  <path d="M 185 300 Q 190 315 200 320 Q 210 315 215 300"
+        stroke="#4a3228" stroke-width="2" fill="#3e2723" opacity="0.6"/>
+
+  <!-- Subtle fur texture lines on forehead -->
+  <path d="M 185 185 Q 190 178 200 176 Q 210 178 215 185" stroke="#4a3228" stroke-width="1" fill="none" opacity="0.4"/>
+  <path d="M 180 192 Q 190 186 200 184 Q 210 186 220 192" stroke="#4a3228" stroke-width="1" fill="none" opacity="0.3"/>
+
+  <!-- Purple accent glow at bottom -->
+  <ellipse cx="200" cy="340" rx="60" ry="8" fill="#8B5CF6" opacity="0.15"/>
+
+  <!-- Text -->
+  <text x="200" y="370" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" fill="#8B5CF6" letter-spacing="4">PROJECT MOOSE</text>
+</svg>
