@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/moose-logo.svg" alt="Project Moose" width="200" />
+  <img src="docs/images/moose-logo.png" alt="Project Moose" width="200" />
 </p>
 
 <h1 align="center">Project Moose</h1>
