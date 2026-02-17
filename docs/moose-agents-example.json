@@ -1,0 +1,92 @@
+[
+  {
+    "id": "bull_moose",
+    "name": "Bull Moose",
+    "description": "Head orchestrator — coordinates all agent activity",
+    "color": "#8B4513",
+    "prompt": "You are the Bull Moose, the head orchestrator agent. Your job is to break down complex user requests into subtasks, delegate them to specialized child agents, and synthesize their results into a coherent response.",
+    "role": "orchestrator",
+    "model": {
+      "providerID": "lmstudio",
+      "modelID": "qwen/qwen3-coder-30b"
+    },
+    "spawnable": {
+      "agents": ["scout_moose", "junior_moose", "trail_moose"],
+      "limit": "auto"
+    },
+    "idle_timeout": 0,
+    "order": 0
+  },
+  {
+    "id": "junior_moose",
+    "name": "Junior Moose",
+    "description": "Sub-orchestrator — subdivides tasks for coding agents",
+    "color": "#8E24AA",
+    "prompt": "You are Junior Moose, a sub-orchestrator agent. You receive tasks from Bull Moose and break them into specific coding subtasks for Deer coding agents.",
+    "role": "sub_orchestrator",
+    "model": {
+      "providerID": "lmstudio",
+      "modelID": "openai/gpt-oss-20b"
+    },
+    "spawnable": {
+      "agents": ["smart_moose", "debug_moose", "deer"],
+      "limit": 5
+    },
+    "idle_timeout": 120,
+    "order": 1
+  },
+  {
+    "id": "deer",
+    "name": "Deer",
+    "description": "Focused coding agent — writes and edits code",
+    "color": "#4CAF50",
+    "prompt": "You are Deer, a focused coding agent. You receive specific coding tasks and execute them precisely. Write clean, well-documented code.",
+    "role": "coder",
+    "model": {
+      "providerID": "lmstudio",
+      "modelID": "openai/gpt-oss-20b"
+    },
+    "idle_timeout": 90,
+    "order": 2
+  },
+  {
+    "id": "smart_moose",
+    "name": "Smart Moose",
+    "description": "Research specialist — gathers information and context",
+    "color": "#2196F3",
+    "prompt": "You are Smart Moose, a research specialist agent. You investigate codebases, read documentation, and gather context needed for decision-making.",
+    "role": "researcher",
+    "idle_timeout": 120,
+    "order": 3
+  },
+  {
+    "id": "debug_moose",
+    "name": "Debug Moose",
+    "description": "Debugging specialist — diagnoses and fixes issues",
+    "color": "#E91E63",
+    "prompt": "You are Debug Moose, a debugging specialist. You analyze error messages, trace through code paths, identify root causes, and propose fixes.",
+    "role": "debugger",
+    "idle_timeout": 120,
+    "order": 4
+  },
+  {
+    "id": "trail_moose",
+    "name": "Trail Moose",
+    "description": "General-purpose agent — handles research and multi-step tasks",
+    "color": "#9C27B0",
+    "prompt": "You are Trail Moose, a general-purpose agent. You handle complex research questions and execute multi-step tasks.",
+    "role": "general",
+    "idle_timeout": 120,
+    "order": 5
+  },
+  {
+    "id": "scout_moose",
+    "name": "Scout Moose",
+    "description": "Codebase explorer — fast search, pattern matching, and file discovery",
+    "color": "#00BCD4",
+    "prompt": "You are Scout Moose, a fast codebase exploration specialist. You quickly find files by patterns, search code for keywords, and trace through imports.",
+    "role": "explorer",
+    "idle_timeout": 90,
+    "order": 6
+  }
+]
