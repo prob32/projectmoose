@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
+import { For, Show, type JSX, createEffect, createMemo, createSignal, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { QuestionRequest } from "@opencode-ai/sdk/v2"
 import type { Message, Part, ToolPart, SubtaskPart } from "@opencode-ai/sdk/v2/client"
@@ -29,6 +29,103 @@ const TOOL_LABELS: Record<string, string> = {
   todowrite: "Write Todos",
   web_search: "Web Search",
   web_fetch: "Web Fetch",
+}
+
+/** Smart scroll container: auto-scrolls only if user is at bottom, shows scroll-to-bottom button */
+function SmartScrollContainer(props: { messages: any[]; children: JSX.Element }) {
+  let containerRef: HTMLDivElement | undefined
+  const [isAtBottom, setIsAtBottom] = createSignal(true)
+  const [unreadCount, setUnreadCount] = createSignal(0)
+  const [prevMsgCount, setPrevMsgCount] = createSignal(0)
+
+  function checkIfAtBottom() {
+    if (!containerRef) return true
+    const threshold = 40
+    return containerRef.scrollTop + containerRef.clientHeight >= containerRef.scrollHeight - threshold
+  }
+
+  function handleScroll() {
+    const atBottom = checkIfAtBottom()
+    setIsAtBottom(atBottom)
+    if (atBottom) setUnreadCount(0)
+  }
+
+  function scrollToBottom() {
+    if (!containerRef) return
+    containerRef.scrollTo({ top: containerRef.scrollHeight, behavior: "smooth" })
+    setIsAtBottom(true)
+    setUnreadCount(0)
+  }
+
+  // Auto-scroll when new messages arrive, but only if user is at bottom
+  createEffect(() => {
+    const count = props.messages.length
+    const prev = prevMsgCount()
+    setPrevMsgCount(count)
+
+    if (count > prev && prev > 0) {
+      if (isAtBottom()) {
+        requestAnimationFrame(() => {
+          containerRef?.scrollTo({ top: containerRef.scrollHeight, behavior: "smooth" })
+        })
+      } else {
+        setUnreadCount((c) => c + (count - prev))
+      }
+    }
+  })
+
+  return (
+    <div
+      ref={containerRef}
+      class="flex-1 min-h-0 overflow-y-auto px-4 py-3"
+      style={{ position: "relative" }}
+      onScroll={handleScroll}
+    >
+      {props.children}
+      {/* Scroll-to-bottom button */}
+      <Show when={!isAtBottom()}>
+        <button
+          onClick={scrollToBottom}
+          style={{
+            position: "sticky",
+            bottom: "8px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            "align-items": "center",
+            gap: "4px",
+            padding: "4px 12px",
+            "border-radius": "16px",
+            border: "1px solid rgba(139, 92, 246, 0.3)",
+            background: "rgba(15, 13, 26, 0.9)",
+            "backdrop-filter": "blur(12px)",
+            color: "#8b87a0",
+            "font-size": "11px",
+            "font-weight": "600",
+            cursor: "pointer",
+            "z-index": "10",
+            "box-shadow": "0 4px 12px rgba(0,0,0,0.3)",
+          }}
+        >
+          <span>{"\u2193"}</span>
+          <Show when={unreadCount() > 0}>
+            <span
+              style={{
+                background: "rgba(139, 92, 246, 0.6)",
+                "border-radius": "8px",
+                padding: "0 5px",
+                "font-size": "10px",
+                color: "#fff",
+              }}
+            >
+              {unreadCount()}
+            </span>
+          </Show>
+          <span>Scroll to bottom</span>
+        </button>
+      </Show>
+    </div>
+  )
 }
 
 /** Collapsible tool call display for the agent chat panel */
@@ -120,6 +217,8 @@ function ToolCallBubble(props: { part: ToolPart }) {
 /** Lightweight chat bubble for the agent chat panel */
 function ChatBubble(props: { message: Message; parts: Part[]; agentColor?: string }) {
   const isUser = () => props.message.role === "user"
+  const [showCopy, setShowCopy] = createSignal(false)
+  const [copied, setCopied] = createSignal(false)
 
   // Separate text parts and tool parts
   const textParts = createMemo(() => props.parts.filter((p) => p.type === "text" && "text" in p))
@@ -131,13 +230,89 @@ function ChatBubble(props: { message: Message; parts: Part[]; agentColor?: strin
   const borderColor = () =>
     !isUser() && props.agentColor ? props.agentColor : undefined
 
+  /** Full text content for copy */
+  const fullText = createMemo(() =>
+    textParts()
+      .map((p) => (p as { text: string }).text)
+      .join("\n"),
+  )
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(fullText())
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // fallback
+    }
+  }
+
+  /** Render text with basic inline markdown: **bold**, `code`, ```blocks``` */
+  function renderMarkdownText(text: string) {
+    // Split on code blocks first
+    const parts = text.split(/(```[\s\S]*?```)/g)
+    return parts.map((segment) => {
+      if (segment.startsWith("```") && segment.endsWith("```")) {
+        const inner = segment.slice(3, -3)
+        // Strip optional language tag from first line
+        const firstNewline = inner.indexOf("\n")
+        const code = firstNewline > -1 ? inner.slice(firstNewline + 1) : inner
+        return (
+          <pre
+            style={{
+              background: "rgba(0,0,0,0.2)",
+              "border-radius": "6px",
+              padding: "8px 10px",
+              overflow: "auto",
+              "font-size": "12px",
+              "line-height": "1.5",
+              margin: "4px 0",
+            }}
+          >
+            <code>{code}</code>
+          </pre>
+        )
+      }
+      // Inline formatting: **bold**, `inline code`
+      return renderInlineMarkdown(segment)
+    })
+  }
+
+  function renderInlineMarkdown(text: string) {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g)
+    return (
+      <span class="whitespace-pre-wrap break-words">
+        {parts.map((seg) => {
+          if (seg.startsWith("**") && seg.endsWith("**")) {
+            return <strong>{seg.slice(2, -2)}</strong>
+          }
+          if (seg.startsWith("`") && seg.endsWith("`")) {
+            return (
+              <code
+                style={{
+                  background: "rgba(139, 92, 246, 0.12)",
+                  "border-radius": "3px",
+                  padding: "1px 4px",
+                  "font-size": "0.92em",
+                }}
+              >
+                {seg.slice(1, -1)}
+              </code>
+            )
+          }
+          return seg
+        })}
+      </span>
+    )
+  }
+
   return (
     <div class="flex flex-col gap-1.5 max-w-[90%]" classList={{ "self-end": isUser(), "self-start": !isUser() }}>
       {/* Text content bubble */}
       <Show when={textParts().length > 0}>
         <div
           classList={{
-            "flex flex-col gap-1 px-3 py-2 rounded-lg text-13-regular": true,
+            "flex flex-col gap-1 px-3 py-2 rounded-lg text-13-regular relative": true,
             "bg-surface-base text-text-strong": isUser(),
             "text-text-base": !isUser(),
           }}
@@ -155,10 +330,37 @@ function ChatBubble(props: { message: Message; parts: Part[]; agentColor?: strin
                   }
                 : {}),
           }}
+          onMouseEnter={() => setShowCopy(true)}
+          onMouseLeave={() => setShowCopy(false)}
         >
           <For each={textParts()}>
-            {(part) => <div class="whitespace-pre-wrap break-words">{(part as { text: string }).text}</div>}
+            {(part) => <div>{renderMarkdownText((part as { text: string }).text)}</div>}
           </For>
+          {/* Hover copy button */}
+          <Show when={showCopy() && fullText().length > 0}>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCopy() }}
+              style={{
+                position: "absolute",
+                top: "4px",
+                right: "4px",
+                width: "22px",
+                height: "22px",
+                "border-radius": "4px",
+                border: "none",
+                background: "rgba(139, 92, 246, 0.2)",
+                color: copied() ? "#22c55e" : "#8b87a0",
+                "font-size": "11px",
+                cursor: "pointer",
+                display: "flex",
+                "align-items": "center",
+                "justify-content": "center",
+              }}
+              title="Copy to clipboard"
+            >
+              {copied() ? "\u2713" : "\u2398"}
+            </button>
+          </Show>
         </div>
       </Show>
 
@@ -382,253 +584,6 @@ function TaskAssigner(props: {
         </Show>
       </div>
     </div>
-  )
-}
-
-/** Group Chat Panel — shared conversation between multiple lasso-selected agents */
-function GroupChatPanel() {
-  const canvas = useCanvas()
-  const sync = useSync()
-  const sdk = useSDK()
-  const [inputText, setInputText] = createSignal("")
-
-  const group = () => canvas.groupChat
-  const sessionID = () => group()?.sessionID
-
-  // Load messages for the group session
-  createEffect(() => {
-    const sid = sessionID()
-    if (sid) {
-      sync.session.message(sid)
-    }
-  })
-
-  const messages = createMemo(() => {
-    const sid = sessionID()
-    if (!sid) return []
-    return sync.data.message[sid] ?? []
-  })
-
-  const partsFor = (messageID: string) => {
-    const sid = sessionID()
-    if (!sid) return []
-    return sync.data.part[sid]?.[messageID] ?? []
-  }
-
-  // Resolve member instances + definitions
-  const members = createMemo(() => {
-    const g = group()
-    if (!g) return []
-    return g.memberInstanceIDs
-      .map((id) => {
-        const inst = canvas.instances.find((i) => i.id === id)
-        if (!inst) return undefined
-        const def = canvas.definitionFor(inst)
-        return { instance: inst, definition: def }
-      })
-      .filter(Boolean) as Array<{ instance: AgentInstanceInfo; definition: AgentDefinitionInfo | undefined }>
-  })
-
-  // Resolve agent color from a message's `agent` field
-  function agentColorForMessage(msg: Message): string | undefined {
-    const agentID = (msg as any).agent as string | undefined
-    if (!agentID) return undefined
-    const member = members().find((m) => (m.definition?.id ?? m.instance.agentDefinitionID) === agentID)
-    return member?.definition?.color
-  }
-
-  function agentNameForMessage(msg: Message): string | undefined {
-    const agentID = (msg as any).agent as string | undefined
-    if (!agentID) return undefined
-    const member = members().find((m) => (m.definition?.id ?? m.instance.agentDefinitionID) === agentID)
-    return member?.definition?.name ?? agentID
-  }
-
-  // Current responding agent info
-  const currentAgent = createMemo(() => {
-    const g = group()
-    if (!g || g.status !== "running") return undefined
-    return members()[g.currentAgentIndex]
-  })
-
-  async function handleSend() {
-    const text = inputText().trim()
-    if (!text || !group()) return
-    setInputText("")
-
-    // Import dynamically to avoid circular deps
-    const { startRoundRobin } = await import("@/components/canvas/group-chat-orchestrator")
-    startRoundRobin(text, {
-      client: sdk.client,
-      syncData: sync.data,
-      canvas: {
-        instances: canvas.instances,
-        groupChat: canvas.groupChat!,
-        definitionFor: canvas.definitionFor,
-        setGroupChatStatus: canvas.setGroupChatStatus,
-      },
-    })
-  }
-
-  async function handleStop() {
-    const { abortRoundRobin } = await import("@/components/canvas/group-chat-orchestrator")
-    abortRoundRobin({
-      client: sdk.client,
-      canvas: {
-        groupChat: canvas.groupChat!,
-        setGroupChatStatus: canvas.setGroupChatStatus,
-      } as any,
-    })
-  }
-
-  function handleClose() {
-    handleStop()
-    canvas.clearGroupChat()
-  }
-
-  // Auto-scroll ref
-  let scrollRef: HTMLDivElement | undefined
-  createEffect(() => {
-    // Trigger on messages change
-    messages()
-    if (scrollRef) {
-      setTimeout(() => scrollRef!.scrollTo({ top: scrollRef!.scrollHeight, behavior: "smooth" }), 50)
-    }
-  })
-
-  return (
-    <Show when={group()}>
-      <div class="flex-1 min-h-0 flex flex-col pointer-events-auto border-t border-border-weak-base bg-background-stronger/95 backdrop-blur-sm">
-        {/* Header */}
-        <div class="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border-weak-base">
-          <div class="flex items-center gap-2">
-            <span class="text-12-medium text-text-strong">Group Chat</span>
-            <div class="flex items-center gap-1">
-              <For each={members()}>
-                {(m) => (
-                  <div
-                    class="size-2 rounded-full"
-                    style={{ "background-color": m.definition?.color ?? "#666" }}
-                    title={m.definition?.name ?? m.instance.agentDefinitionID}
-                  />
-                )}
-              </For>
-            </div>
-            <span class="text-11-regular text-text-weak">
-              {members().length} agents
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            {/* Progress indicator */}
-            <Show when={group()!.status === "running" && currentAgent()}>
-              <div class="flex items-center gap-1.5 text-11-regular text-text-weak animate-pulse">
-                <div
-                  class="size-2 rounded-full"
-                  style={{ "background-color": currentAgent()!.definition?.color ?? "#666" }}
-                />
-                <span>
-                  {currentAgent()!.definition?.name ?? "Agent"} responding...
-                  ({group()!.currentAgentIndex + 1}/{group()!.memberInstanceIDs.length})
-                </span>
-              </div>
-            </Show>
-            <button
-              classList={{
-                "h-6 px-2 flex items-center gap-1 rounded-md text-11-medium border transition-colors": true,
-                "text-red-400 hover:text-red-300 hover:bg-red-500/10 border-red-500/30": group()!.status === "running",
-                "text-text-weak hover:text-text-strong hover:bg-surface-base-hover border-border-weak-base": group()!.status !== "running",
-              }}
-              onClick={group()!.status === "running" ? handleStop : handleClose}
-              aria-label={group()!.status === "running" ? "Stop round-robin" : "Close group chat"}
-            >
-              <Icon name="close" class="size-3" />
-              {group()!.status === "running" ? "Stop" : "Close"}
-            </button>
-          </div>
-        </div>
-
-        {/* Messages scroll area */}
-        <div ref={scrollRef} class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-          <Show
-            when={messages().length > 0}
-            fallback={
-              <div class="flex flex-col items-center justify-center py-8 text-center">
-                <div class="text-12-regular text-text-weak">Group chat created</div>
-                <div class="text-11-regular text-text-weak mt-1">
-                  Type a prompt below — each agent will respond in turn
-                </div>
-              </div>
-            }
-          >
-            <div class="flex flex-col gap-2">
-              <For each={messages()}>
-                {(msg) => {
-                  const color = () => agentColorForMessage(msg)
-                  const name = () => agentNameForMessage(msg)
-                  return (
-                    <div>
-                      <Show when={msg.role === "assistant" && name()}>
-                        <div
-                          class="text-10-medium mb-0.5 px-1"
-                          style={{ color: color() ?? "#8b87a0" }}
-                        >
-                          {name()}
-                        </div>
-                      </Show>
-                      <ChatBubble message={msg} parts={partsFor(msg.id)} agentColor={color()} />
-                    </div>
-                  )
-                }}
-              </For>
-
-              {/* Working indicator */}
-              <Show when={group()!.status === "running"}>
-                <div class="flex items-center gap-2 px-3 py-2 mt-2 rounded-md border border-purple-500/30 bg-purple-500/5">
-                  <div
-                    class="size-2 rounded-full"
-                    style={{ "background-color": currentAgent()?.definition?.color ?? "#8b5cf6" }}
-                  />
-                  <span class="text-purple-400 text-12-medium animate-pulse">
-                    {currentAgent()?.definition?.name ?? "Agent"} is thinking...
-                  </span>
-                </div>
-              </Show>
-            </div>
-          </Show>
-        </div>
-
-        {/* Input area */}
-        <div class="shrink-0 px-4 py-3 border-t border-border-weak-base">
-          <div class="flex items-center gap-2">
-            <input
-              type="text"
-              class="flex-1 h-8 px-3 rounded-md bg-surface-base border border-border-weak-base text-13-regular text-text-strong placeholder:text-text-weak focus:outline-none focus:border-purple-500/50"
-              placeholder={
-                group()!.status === "running"
-                  ? "Waiting for agents..."
-                  : "Send a prompt to all agents..."
-              }
-              value={inputText()}
-              onInput={(e) => setInputText(e.currentTarget.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              disabled={group()!.status === "running"}
-            />
-            <button
-              class="h-8 px-3 rounded-md bg-purple-600 hover:bg-purple-500 text-white text-12-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={handleSend}
-              disabled={group()!.status === "running" || !inputText().trim()}
-            >
-              Send
-            </button>
-          </div>
-        </div>
-      </div>
-    </Show>
   )
 }
 
@@ -917,15 +872,10 @@ export function SessionPromptDock(props: {
     <div
       ref={props.setPromptDockRef}
       class="absolute inset-x-0 bottom-0 flex flex-col justify-end z-50 pointer-events-none"
-      style={{ "max-height": selectedAgent() || canvas.groupChat ? "45vh" : undefined }}
+      style={{ "max-height": selectedAgent() ? "45vh" : undefined }}
     >
-      {/* Group chat panel — takes priority over single-agent panel */}
-      <Show when={canvas.groupChat}>
-        <GroupChatPanel />
-      </Show>
-
-      {/* Agent chat panel — expands upward when an agent is selected (hidden when group chat is active) */}
-      <Show when={agentSessionID() && !canvas.groupChat}>
+      {/* Agent chat panel — expands upward when an agent is selected */}
+      <Show when={agentSessionID()}>
         <div class="flex-1 min-h-0 flex flex-col pointer-events-auto border-t border-border-weak-base bg-background-stronger/95 backdrop-blur-sm">
           {/* Agent header bar */}
           <div class="shrink-0 flex items-center justify-between px-4 py-2 border-b border-border-weak-base">
@@ -1015,8 +965,8 @@ export function SessionPromptDock(props: {
           {/* Collapsible todo list — between header and messages */}
           <AgentTodoPanel sessionID={agentSessionID()!} agentColor={agentDef()?.color} />
 
-          {/* Messages scroll area */}
-          <div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+          {/* Messages scroll area with smart auto-scroll */}
+          <SmartScrollContainer messages={messages()}>
             <Show
               when={messages().length > 0}
               fallback={
@@ -1045,6 +995,50 @@ export function SessionPromptDock(props: {
                 <Show when={selectedAgent()?.state === "working"}>
                   <div class="flex items-center gap-2 px-3 py-2 mt-2 rounded-md border border-yellow-500/30 bg-yellow-500/5">
                     <span class="text-yellow-500 text-12-medium animate-pulse">{"\u26A1"} Working...</span>
+                  </div>
+                </Show>
+
+                {/* Error bar with retry/reset actions */}
+                <Show when={selectedAgent()?.state === "error"}>
+                  <div class="flex items-center gap-2 px-3 py-2 mt-2 rounded-md border border-red-500/30 bg-red-500/5">
+                    <span class="text-red-500 text-12-medium shrink-0">{"\u274C"} Error</span>
+                    <span class="text-11-regular text-text-weak truncate flex-1" title={selectedAgent()?.errorMessage}>
+                      {selectedAgent()?.errorMessage ?? "Unknown error"}
+                    </span>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button
+                        class="px-2 py-1 rounded text-11-medium border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+                        onClick={() => {
+                          const inst = selectedAgent()
+                          if (inst) canvas.setInstanceState(inst.id, "idle")
+                        }}
+                      >
+                        Reset
+                      </button>
+                      <button
+                        class="px-2 py-1 rounded text-11-medium border border-violet-500/30 bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors cursor-pointer"
+                        onClick={async () => {
+                          const inst = selectedAgent()
+                          if (!inst?.sessionID) return
+                          const msgs = sync.data.message[inst.sessionID] ?? []
+                          const lastUserMsg = [...msgs].reverse().find((m) => m.role === "user")
+                          if (!lastUserMsg) return
+                          const parts = sync.data.part[lastUserMsg.id] ?? []
+                          const textParts = parts.filter((p: any) => p.type === "text")
+                          if (textParts.length === 0) return
+                          await canvas.setInstanceState(inst.id, "working")
+                          const def = agentDef()
+                          await sdk.client.session.promptAsync({
+                            sessionID: inst.sessionID,
+                            agent: def?.id ?? inst.agentDefinitionID,
+                            ...(def?.model ? { model: { providerID: def.model.providerID, modelID: def.model.modelID } } : {}),
+                            parts: textParts.map((p: any) => ({ type: "text" as const, text: p.text })),
+                          })
+                        }}
+                      >
+                        Retry
+                      </button>
+                    </div>
                   </div>
                 </Show>
 
@@ -1122,7 +1116,7 @@ export function SessionPromptDock(props: {
                 <div ref={(el) => (scrollAnchor = el)} />
               </div>
             </Show>
-          </div>
+          </SmartScrollContainer>
         </div>
       </Show>
 

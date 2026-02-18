@@ -7,6 +7,7 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { getSessionContextMetrics } from "@/components/session/session-context-metrics"
 import { AgentEditDialog } from "@/components/agent-edit-dialog"
 import { useSDK } from "@/context/sdk"
+import { copyToClipboard } from "@/utils/clipboard"
 
 export type AgentNodeContextMenuProps = {
   workspaceSessionID: string
@@ -106,6 +107,47 @@ export const AgentNodeContextMenu: Component<AgentNodeContextMenuProps> = (props
     canvas.closeNodeContextMenu()
     canvas.removeInstance(inst.id)
     canvas.deselect()
+  }
+
+  /** Retry: re-send the last user message to the errored agent */
+  async function handleRetry() {
+    const inst = instance()
+    if (!inst?.sessionID) return
+    canvas.closeNodeContextMenu()
+
+    const msgs = sync.data.message[inst.sessionID] ?? []
+    const lastUserMsg = [...msgs].reverse().find((m) => m.role === "user")
+    if (!lastUserMsg) return
+
+    const parts = sync.data.part[lastUserMsg.id] ?? []
+    const textParts = parts.filter((p: any) => p.type === "text")
+    if (textParts.length === 0) return
+
+    await canvas.setInstanceState(inst.id, "working")
+
+    const def = definition()
+    await sdk.client.session.promptAsync({
+      sessionID: inst.sessionID,
+      agent: def?.id ?? inst.agentDefinitionID,
+      ...(def?.model ? { model: { providerID: def.model.providerID, modelID: def.model.modelID } } : {}),
+      parts: textParts.map((p: any) => ({ type: "text" as const, text: p.text })),
+    })
+  }
+
+  /** Reset errored agent back to idle */
+  async function handleReset() {
+    const inst = instance()
+    if (!inst) return
+    canvas.closeNodeContextMenu()
+    await canvas.setInstanceState(inst.id, "idle")
+  }
+
+  /** Copy error message to clipboard */
+  async function handleCopyError() {
+    const inst = instance()
+    if (!inst?.errorMessage) return
+    await copyToClipboard(inst.errorMessage)
+    canvas.closeNodeContextMenu()
   }
 
   // Clamp position to keep menu within viewport
@@ -251,6 +293,37 @@ export const AgentNodeContextMenu: Component<AgentNodeContextMenuProps> = (props
                 margin: "4px 0",
               }}
             />
+          </Show>
+
+          {/* Error Recovery — shown when agent is in error state */}
+          <Show when={instance()?.state === "error"}>
+            <div
+              style={{
+                padding: "4px 12px",
+                "font-size": "11px",
+                color: "var(--canvas-error, #ef4444)",
+                "max-width": "200px",
+                overflow: "hidden",
+                "text-overflow": "ellipsis",
+                "white-space": "nowrap",
+              }}
+              title={instance()?.errorMessage}
+            >
+              {instance()?.errorMessage ?? "Unknown error"}
+            </div>
+            <button class="canvas-context-menu-item" onClick={handleRetry}>
+              <span style={{ "font-size": "13px" }}>&#x21BB;</span>
+              <span>Retry Last Prompt</span>
+            </button>
+            <button class="canvas-context-menu-item" onClick={handleReset}>
+              <span style={{ "font-size": "13px" }}>&#x23EE;</span>
+              <span>Reset to Idle</span>
+            </button>
+            <button class="canvas-context-menu-item" onClick={handleCopyError}>
+              <span style={{ "font-size": "13px" }}>&#x1F4CB;</span>
+              <span>Copy Error</span>
+            </button>
+            <div class="canvas-context-menu-divider" />
           </Show>
 
           {/* Actions */}

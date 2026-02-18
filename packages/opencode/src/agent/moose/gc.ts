@@ -2,6 +2,7 @@ import { Scheduler } from "@/scheduler"
 import { Log } from "@/util/log"
 import { Bus } from "@/bus"
 import { Session } from "@/session"
+import { Instance } from "@/project/instance"
 import { MooseAgentInstance } from "./instance"
 import { MooseAgentDefinition } from "./definition"
 import { MooseAgentEvent } from "./events"
@@ -16,13 +17,20 @@ export namespace MooseAgentGC {
   const WARNING_THRESHOLD_S = 30
 
   export function init() {
+    // Capture the instance directory at init time — this runs inside Instance.provide()
+    // but the setInterval callback will fire outside that context.
+    const directory = Instance.directory
     Scheduler.register({
       id: "moose.agent.gc",
       interval: SWEEP_INTERVAL_MS,
-      run: sweep,
+      run: () =>
+        Instance.provide({
+          directory,
+          fn: sweep,
+        }),
       scope: "instance",
     })
-    log.info("GC registered", { interval: SWEEP_INTERVAL_MS })
+    log.info("GC registered", { interval: SWEEP_INTERVAL_MS, directory })
   }
 
   /** Archive the session linked to a Moose instance, then remove the instance */

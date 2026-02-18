@@ -265,6 +265,26 @@ export namespace Agent {
               todowrite: "deny",
             }
 
+        // If permissionMode is "plan", restrict edit tools (same as native plan agent)
+        const planPerms: Record<string, string | Record<string, string>> =
+          def.permissionMode === "plan"
+            ? {
+                edit: { "*": "deny" },
+                plan_exit: "allow",
+              }
+            : {}
+
+        // Build thinking/reasoning options from the definition
+        const thinkingOptions: Record<string, any> = {}
+        if (def.thinking) {
+          if (def.thinking.budget) {
+            thinkingOptions.thinking = { type: "enabled", budgetTokens: def.thinking.budget }
+          }
+          if (def.thinking.effort) {
+            thinkingOptions.reasoningEffort = def.thinking.effort
+          }
+        }
+
         result[def.id] = {
           name: def.id,
           description: def.description ?? `Moose agent: ${def.name}`,
@@ -278,10 +298,11 @@ export namespace Agent {
             PermissionNext.fromConfig({
               ...orchestratorPerms,
               ...mcpPerms,
+              ...planPerms,
             }),
             user,
           ),
-          options: {},
+          options: thinkingOptions,
           native: false,
         }
       }

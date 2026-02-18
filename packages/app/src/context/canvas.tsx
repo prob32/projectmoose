@@ -2,6 +2,7 @@ import { createStore, produce, reconcile } from "solid-js/store"
 import { batch, createEffect, createMemo, onCleanup } from "solid-js"
 import { createSimpleContext } from "@opencode-ai/ui/context"
 import { useSDK } from "./sdk"
+import { CanvasPhysics, type PhysicsNode } from "@/components/canvas/canvas-physics"
 
 /** Types matching the backend MooseAgentInstance.Info and MooseAgentDefinition.Info shapes */
 export type AgentInstanceInfo = {
@@ -28,10 +29,28 @@ export type AgentDefinitionInfo = {
   role?: string
   model?: { providerID: string; modelID: string }
   temperature?: number
+  permissionMode?: "build" | "plan"
+  thinking?: { budget?: number; effort?: string }
   mcp?: { servers?: string[]; deny?: string[] }
+  tools?: { mode: "all" | "scoped"; allow?: string[]; deny?: string[] }
+  skills?: string[]
   spawnable?: { agents: string[]; limit: number | "auto" }
   idle_timeout: number
   order: number
+}
+
+export type AgentFolder = {
+  id: string
+  name: string
+  description?: string
+  icon?: string
+  color: string
+  agents: AgentDefinitionInfo[]
+}
+
+export type AgentFolderConfig = {
+  activeFolder: string
+  folders: AgentFolder[]
 }
 
 type GCWarningEntry = { secondsRemaining: number; timestamp: number }
@@ -47,6 +66,8 @@ export type AgentMessage = {
 type CanvasStore = {
   instances: AgentInstanceInfo[]
   definitions: AgentDefinitionInfo[]
+  folders: AgentFolder[]
+  activeFolder: string
   selectedID: string | undefined
   draggingID: string | undefined
   dragOffset: { x: number; y: number }
@@ -57,17 +78,6 @@ type CanvasStore = {
   agentMessages: AgentMessage[]
   /** Instance IDs that recently completed a task (working → idle). Auto-expires after 2s. */
   completedInstances: Record<string, number>
-  /** Lasso drag rectangle state (for multi-select) */
-  lasso: { startX: number; startY: number; currentX: number; currentY: number } | undefined
-  /** IDs of instances currently inside the lasso rectangle */
-  lassoSelectedIDs: string[]
-  /** Active group chat (undefined when no group is active) */
-  groupChat: {
-    memberInstanceIDs: string[]
-    sessionID: string
-    status: "idle" | "running"
-    currentAgentIndex: number
-  } | undefined
 }
 
 export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext({
@@ -79,6 +89,8 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
     const [store, setStore] = createStore<CanvasStore>({
       instances: [],
       definitions: [],
+      folders: [],
+      activeFolder: "default",
       selectedID: undefined,
       draggingID: undefined,
       dragOffset: { x: 0, y: 0 },
@@ -88,10 +100,68 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       gcWarnings: {},
       agentMessages: [],
       completedInstances: {},
-      lasso: undefined,
-      lassoSelectedIDs: [],
-      groupChat: undefined,
     })
+
+    // ===== Physics Engine =====
+    const physics = new CanvasPhysics()
+
+    // Sync physics positions → Solid.js store (throttled to ~30fps by the engine)
+    physics.setOnTick((nodes) => {
+      batch(() => {
+        for (const [id, node] of nodes) {
+          setStore(
+            "instances",
+            (inst) => inst.id === id,
+            produce((draft) => {
+              draft.positionX = Math.round(node.x)
+              draft.positionY = Math.round(node.y)
+            }),
+          )
+        }
+      })
+    })
+
+    // On simulation settle, persist all final positions to backend
+    physics.setOnSettle((nodes) => {
+      for (const [id, node] of nodes) {
+        const x = Math.round(node.x)
+        const y = Math.round(node.y)
+        fetch(`${sdk.url}/agent-instance/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "x-opencode-directory": sdk.directory,
+          },
+          body: JSON.stringify({ positionX: x, positionY: y }),
+        }).catch(() => {})
+      }
+    })
+
+    onCleanup(() => physics.destroy())
+
+    /** Feed all current instances and connections into the physics engine */
+    function syncPhysicsFromStore() {
+      // Add nodes that aren't in physics yet, update positions for ones that are
+      const existingIds = new Set<string>()
+      for (const inst of store.instances) {
+        existingIds.add(inst.id)
+        const existing = physics.getNode(inst.id)
+        if (!existing) {
+          physics.addNode({ id: inst.id, x: inst.positionX, y: inst.positionY })
+        }
+      }
+      // Remove nodes that were deleted from the store
+      for (const [id] of physics.getAllNodes()) {
+        if (!existingIds.has(id)) {
+          physics.removeNode(id)
+        }
+      }
+      // Sync links from connections
+      const conns = connections()
+      for (const conn of conns) {
+        physics.addLink(conn.parentID, conn.childID)
+      }
+    }
 
     // Subscribe to real-time agent events via SSE
     // Note: sdk.event.listen() (createGlobalEmitter) delivers { name, details }
@@ -115,6 +185,16 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
               }),
             )
           })
+          // Add to physics engine with spawn animation
+          if (!physics.getNode(inst.id)) {
+            physics.spawnNode(
+              { id: inst.id, x: inst.positionX, y: inst.positionY },
+              inst.parentInstanceID,
+            )
+            if (inst.parentInstanceID) {
+              physics.addLink(inst.parentInstanceID, inst.id)
+            }
+          }
           break
         }
         case "moose.agent.state_changed": {
@@ -245,7 +325,7 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
     }, 1000)
     onCleanup(() => clearInterval(pruneInterval))
 
-    /** Fetch agent definitions from the backend */
+    /** Fetch agent definitions from the backend (active folder's agents) */
     async function fetchDefinitions() {
       try {
         const res = await fetch(`${sdk.url}/moose-agent`, {
@@ -259,6 +339,41 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       }
     }
 
+    /** Fetch all folders metadata from the backend */
+    async function fetchFolders() {
+      try {
+        const res = await fetch(`${sdk.url}/moose-agent-folder`, {
+          headers: { "x-opencode-directory": sdk.directory },
+        })
+        if (!res.ok) return
+        const data: AgentFolderConfig = await res.json()
+        setStore("folders", data.folders)
+        setStore("activeFolder", data.activeFolder)
+      } catch {
+        // ignore
+      }
+    }
+
+    /** Switch the active folder */
+    async function switchFolder(folderId: string) {
+      try {
+        const res = await fetch(`${sdk.url}/moose-agent-active-folder`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "x-opencode-directory": sdk.directory,
+          },
+          body: JSON.stringify({ folderId }),
+        })
+        if (!res.ok) return
+        setStore("activeFolder", folderId)
+        // Refresh definitions from the new active folder
+        await fetchDefinitions()
+      } catch {
+        // ignore
+      }
+    }
+
     /** Fetch all instances for a given workspace session */
     async function fetchInstances(workspaceSessionID: string) {
       try {
@@ -269,6 +384,12 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
         if (!res.ok) return
         const data: AgentInstanceInfo[] = await res.json()
         setStore("instances", reconcile(data, { key: "id" }))
+        // Sync physics engine with loaded instances
+        requestAnimationFrame(() => {
+          syncPhysicsFromStore()
+          // Start with a gentle initial layout pass
+          physics.reheat(0.5)
+        })
       } catch {
         // ignore
       }
@@ -299,15 +420,25 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
             draft.push(created)
           }),
         )
+        // Add to physics with spawn animation (starts at parent, pushes outward)
+        physics.spawnNode(
+          { id: created.id, x: created.positionX, y: created.positionY },
+          input.parentInstanceID,
+        )
+        if (input.parentInstanceID) {
+          physics.addLink(input.parentInstanceID, created.id)
+        }
         return created
       } catch {
         return undefined
       }
     }
 
-    /** Move an instance to a new canvas position */
-    async function moveInstance(instanceID: string, x: number, y: number) {
-      // Optimistic update
+    /** Move an instance to a new canvas position.
+     *  During physics drag, this updates the physics fixed position.
+     *  For non-physics moves (e.g. backend sync), it updates the store directly + persists. */
+    async function moveInstance(instanceID: string, x: number, y: number, persistNow = true) {
+      // Update store
       setStore(
         "instances",
         (inst) => inst.id === instanceID,
@@ -317,17 +448,22 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
         }),
       )
 
-      try {
-        await fetch(`${sdk.url}/agent-instance/${instanceID}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "x-opencode-directory": sdk.directory,
-          },
-          body: JSON.stringify({ positionX: x, positionY: y }),
-        })
-      } catch {
-        // Revert on failure — will be corrected on next fetch
+      // Also update physics node position
+      physics.updateNodePosition(instanceID, x, y)
+
+      if (persistNow) {
+        try {
+          await fetch(`${sdk.url}/agent-instance/${instanceID}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "x-opencode-directory": sdk.directory,
+            },
+            body: JSON.stringify({ positionX: x, positionY: y }),
+          })
+        } catch {
+          // Revert on failure — will be corrected on next fetch
+        }
       }
     }
 
@@ -406,8 +542,14 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       }
     }
 
-    /** Remove an instance from the canvas */
+    /** Remove an instance from the canvas and clean up its session */
     async function removeInstance(instanceID: string) {
+      const instance = store.instances.find((i) => i.id === instanceID)
+      const sessionID = instance?.sessionID
+
+      // Remove from physics
+      physics.removeNode(instanceID)
+
       // Optimistic removal
       setStore(
         "instances",
@@ -419,6 +561,14 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
           method: "DELETE",
           headers: { "x-opencode-directory": sdk.directory },
         })
+
+        // Also clean up the session if it exists
+        if (sessionID) {
+          fetch(`${sdk.url}/session/${sessionID}`, {
+            method: "DELETE",
+            headers: { "x-opencode-directory": sdk.directory },
+          }).catch(() => {}) // Best effort
+        }
       } catch {
         // Revert on next fetch
       }
@@ -433,70 +583,70 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       setStore("selectedID", undefined)
     }
 
-    // Lasso (multi-select) helpers
-    function startLasso(x: number, y: number) {
-      setStore("lasso", { startX: x, startY: y, currentX: x, currentY: y })
-    }
-
-    function updateLasso(x: number, y: number) {
-      setStore("lasso", { startX: store.lasso!.startX, startY: store.lasso!.startY, currentX: x, currentY: y })
-
-      const l = store.lasso!
-      const x1 = Math.min(l.startX, x), y1 = Math.min(l.startY, y)
-      const x2 = Math.max(l.startX, x), y2 = Math.max(l.startY, y)
-      const NODE_CENTER = 36
-
-      const ids = store.instances
-        .filter((inst) => {
-          const cx = inst.positionX + NODE_CENTER
-          const cy = inst.positionY + NODE_CENTER
-          return cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2
-        })
-        .map((inst) => inst.id)
-
-      setStore("lassoSelectedIDs", ids)
-    }
-
-    function endLasso() {
-      setStore("lasso", undefined)
-    }
-
-    function clearLassoSelection() {
-      setStore("lassoSelectedIDs", [])
-    }
-
-    // Group chat helpers
-    function createGroupChat(sessionID: string, memberInstanceIDs: string[]) {
-      setStore("groupChat", {
-        memberInstanceIDs,
-        sessionID,
-        status: "idle" as const,
-        currentAgentIndex: 0,
-      })
-      // Bake lasso selection into group — clear lasso visual
-      setStore("lassoSelectedIDs", [])
-    }
-
-    function clearGroupChat() {
-      setStore("groupChat", undefined)
-    }
-
-    function setGroupChatStatus(status: "idle" | "running", index?: number) {
-      if (!store.groupChat) return
-      setStore("groupChat", "status", status)
-      if (index !== undefined) {
-        setStore("groupChat", "currentAgentIndex", index)
-      }
-    }
-
-    // Drag helpers
+    // Drag helpers — delegate to physics engine for organic connected-node movement
     function startDrag(id: string, offsetX: number, offsetY: number) {
       setStore("draggingID", id)
       setStore("dragOffset", { x: offsetX, y: offsetY })
+      const inst = store.instances.find((i) => i.id === id)
+      if (inst) {
+        physics.startDrag(id, inst.positionX, inst.positionY)
+      }
+    }
+
+    function dragMove(id: string, x: number, y: number) {
+      physics.drag(id, x, y)
     }
 
     function stopDrag() {
+      const dragging = store.draggingID
+      if (dragging) {
+        physics.endDrag(dragging)
+        // Persist final drag position to backend
+        const inst = store.instances.find((i) => i.id === dragging)
+        if (inst) {
+          fetch(`${sdk.url}/agent-instance/${dragging}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "x-opencode-directory": sdk.directory,
+            },
+            body: JSON.stringify({ positionX: inst.positionX, positionY: inst.positionY }),
+          }).catch(() => {})
+        }
+      }
       setStore("draggingID", undefined)
+    }
+
+    // Viewport helpers
+    function setViewport(vp: Partial<{ x: number; y: number; scale: number }>) {
+      setStore("viewport", produce((draft) => {
+        if (vp.x !== undefined) draft.x = vp.x
+        if (vp.y !== undefined) draft.y = vp.y
+        if (vp.scale !== undefined) draft.scale = vp.scale
+      }))
+    }
+
+    function fitView(containerWidth: number, containerHeight: number) {
+      if (store.instances.length === 0) return
+      const padding = 80
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+      for (const inst of store.instances) {
+        minX = Math.min(minX, inst.positionX)
+        minY = Math.min(minY, inst.positionY)
+        maxX = Math.max(maxX, inst.positionX + 72)
+        maxY = Math.max(maxY, inst.positionY + 100)
+      }
+
+      const width = maxX - minX + padding * 2
+      const height = maxY - minY + padding * 2
+      const scale = Math.min(containerWidth / width, containerHeight / height, 2)
+
+      setStore("viewport", {
+        x: (containerWidth - width * scale) / 2 - minX * scale + padding * scale,
+        y: (containerHeight - height * scale) / 2 - minY * scale + padding * scale,
+        scale,
+      })
     }
 
     // Context menu
@@ -568,6 +718,12 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       get definitions() {
         return store.definitions
       },
+      get folders() {
+        return store.folders
+      },
+      get activeFolder() {
+        return store.activeFolder
+      },
       get selectedID() {
         return store.selectedID
       },
@@ -595,20 +751,16 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       get completedInstances() {
         return store.completedInstances
       },
-      get lasso() {
-        return store.lasso
-      },
-      get lassoSelectedIDs() {
-        return store.lassoSelectedIDs
-      },
-      get groupChat() {
-        return store.groupChat
-      },
+      physics,
+      setViewport,
+      fitView,
       selected,
       connections,
       definitionFor,
       definitionMap,
       fetchDefinitions,
+      fetchFolders,
+      switchFolder,
       fetchInstances,
       addInstance,
       spawnChild,
@@ -619,18 +771,12 @@ export const { use: useCanvas, provider: CanvasProvider } = createSimpleContext(
       select,
       deselect,
       startDrag,
+      dragMove,
       stopDrag,
       openContextMenu,
       closeContextMenu,
       openNodeContextMenu,
       closeNodeContextMenu,
-      startLasso,
-      updateLasso,
-      endLasso,
-      clearLassoSelection,
-      createGroupChat,
-      clearGroupChat,
-      setGroupChatStatus,
     }
   },
 })

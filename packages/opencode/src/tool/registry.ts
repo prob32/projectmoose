@@ -28,6 +28,80 @@ import { Truncate } from "./truncation"
 import { PlanExitTool, PlanEnterTool } from "./plan"
 import { ApplyPatchTool } from "./apply_patch"
 
+/** Tool groups for the tool scoping UI — maps group name to individual tool IDs */
+export const TOOL_GROUPS: Record<string, { label: string; tools: Array<{ id: string; name: string; description: string }> }> = {
+  read: {
+    label: "Read & Search",
+    tools: [
+      { id: "read", name: "Read File", description: "Read file contents" },
+      { id: "glob", name: "Find Files", description: "Find files by glob pattern" },
+      { id: "grep", name: "Search", description: "Search file contents with regex" },
+      { id: "codesearch", name: "Code Search", description: "Semantic code search" },
+      { id: "lsp", name: "LSP", description: "Language server protocol" },
+    ],
+  },
+  edit: {
+    label: "Edit & Write",
+    tools: [
+      { id: "edit", name: "Edit File", description: "Modify existing files" },
+      { id: "write", name: "Write File", description: "Create new files" },
+      { id: "apply_patch", name: "Apply Patch", description: "Apply unified diffs" },
+    ],
+  },
+  command: {
+    label: "Shell",
+    tools: [
+      { id: "bash", name: "Terminal", description: "Execute shell commands" },
+    ],
+  },
+  browser: {
+    label: "Web Access",
+    tools: [
+      { id: "web_fetch", name: "Web Fetch", description: "Fetch URL content" },
+      { id: "web_search", name: "Web Search", description: "Search the web" },
+    ],
+  },
+  task: {
+    label: "Subtasks",
+    tools: [
+      { id: "task", name: "Task", description: "Spawn subtask agent" },
+    ],
+  },
+  planning: {
+    label: "Planning",
+    tools: [
+      { id: "todoread", name: "Read Todos", description: "Read todo list" },
+      { id: "todowrite", name: "Write Todos", description: "Update todo list" },
+    ],
+  },
+  interaction: {
+    label: "Interaction",
+    tools: [
+      { id: "question", name: "Question", description: "Ask user a question" },
+    ],
+  },
+  skills: {
+    label: "Skills",
+    tools: [
+      { id: "skill", name: "Skill", description: "Load skill content" },
+    ],
+  },
+}
+
+/** Expand group names and individual tool IDs into a flat set of tool IDs */
+export function expandToolGroups(items: string[]): Set<string> {
+  const result = new Set<string>()
+  for (const item of items) {
+    const group = TOOL_GROUPS[item]
+    if (group) {
+      for (const tool of group.tools) result.add(tool.id)
+    } else {
+      result.add(item)
+    }
+  }
+  return result
+}
+
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
 

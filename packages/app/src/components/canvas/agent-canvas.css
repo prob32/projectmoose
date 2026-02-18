@@ -40,15 +40,31 @@
   user-select: none;
 }
 
+.agent-canvas.panning {
+  cursor: grabbing;
+}
+
+/* ===== Viewport Transform Wrapper ===== */
+
+.agent-canvas-viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
 /* ===== Agent Node ===== */
 
 .agent-node {
   position: absolute;
+  left: 0;
+  top: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: grab;
-  transition: filter 0.2s ease, transform 0.2s ease;
+  will-change: transform;
+  transition: filter 0.2s ease;
 }
 
 .agent-node:active {
@@ -321,14 +337,12 @@
 /* ===== Spawning Animation: Liquid Morphing Emergence ===== */
 /* Applied to newly created nodes via .spawn-enter, and parent flash via .state-spawning */
 
-.agent-node.spawn-enter,
-.agent-node.state-spawning {
-  animation: agent-spawn-liquid 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
+/* Spawn liquid animation is applied to the circle (not the outer node, which uses transform for position) */
 .agent-node.spawn-enter .agent-node-circle,
 .agent-node.state-spawning .agent-node-circle {
-  animation: agent-spawn-morph 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation:
+    agent-spawn-liquid 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards,
+    agent-spawn-morph 2.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Liquid ripple rings that expand outward during spawn */
@@ -463,8 +477,11 @@
 /* ===== Deletion Fade-Out ===== */
 
 .agent-node.deleting {
-  animation: agent-fade-out 0.4s ease-out forwards;
   pointer-events: none;
+}
+
+.agent-node.deleting .agent-node-circle {
+  animation: agent-fade-out 0.4s ease-out forwards;
 }
 
 @keyframes agent-fade-out {
@@ -805,42 +822,121 @@
 }
 
 /* ================================================================
-   Lasso Selection Rectangle
+   Zoom Controls — Bottom-left floating widget
    ================================================================ */
 
-.lasso-rect {
+.canvas-zoom-controls {
   position: absolute;
-  border: 2px dashed rgba(139, 92, 246, 0.6);
-  background: rgba(139, 92, 246, 0.06);
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 10;
-  backdrop-filter: blur(1px);
+  bottom: 16px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(15, 13, 26, 0.88);
+  backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  z-index: 40;
+}
+
+.zoom-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--canvas-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zoom-btn:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--canvas-text-bright);
+}
+
+.zoom-percent {
+  min-width: 40px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--canvas-text-dim);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.zoom-percent:hover {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--canvas-text);
+}
+
+.zoom-fit {
+  margin-left: 2px;
+  border-left: 1px solid rgba(139, 92, 246, 0.12);
+  padding-left: 4px;
+  border-radius: 0 6px 6px 0;
 }
 
 /* ================================================================
-   Group-Selected / Group Chat Member Highlight
+   Minimap — Bottom-right floating widget
    ================================================================ */
 
-.agent-node.group-selected .agent-node-circle {
-  box-shadow:
-    0 0 0 3px rgba(139, 92, 246, 0.5),
-    0 0 20px rgba(139, 92, 246, 0.15),
-    0 4px 16px rgba(0, 0, 0, 0.4);
-  animation: group-selected-pulse 2s ease-in-out infinite;
+.canvas-minimap-container {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-@keyframes group-selected-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 3px rgba(139, 92, 246, 0.5),
-      0 0 20px rgba(139, 92, 246, 0.15),
-      0 4px 16px rgba(0, 0, 0, 0.4);
-  }
-  50% {
-    box-shadow:
-      0 0 0 5px rgba(139, 92, 246, 0.35),
-      0 0 30px rgba(139, 92, 246, 0.2),
-      0 4px 16px rgba(0, 0, 0, 0.4);
-  }
+.minimap-toggle {
+  width: 20px;
+  height: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  border-radius: 4px;
+  background: rgba(15, 13, 26, 0.75);
+  color: var(--canvas-text-dim);
+  font-size: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
 }
+
+.minimap-toggle:hover {
+  background: rgba(139, 92, 246, 0.15);
+  color: var(--canvas-text);
+}
+
+.canvas-minimap {
+  border-radius: 8px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  background: rgba(15, 13, 26, 0.88);
+  backdrop-filter: blur(24px) saturate(1.3);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  padding: 4px;
+}
+

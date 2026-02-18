@@ -39,7 +39,7 @@ import { errors } from "./error"
 import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
-import { MooseAgentRoutes } from "./routes/moose-agent"
+import { MooseAgentRoutes, MooseAgentFolderRoutes, MooseAgentActiveFolderRoutes, ToolsRoutes } from "./routes/moose-agent"
 import { AgentInstanceRoutes } from "./routes/agent-instance"
 import { MDNS } from "./mdns"
 
@@ -237,6 +237,9 @@ export namespace Server {
         .route("/", FileRoutes())
         .route("/mcp", McpRoutes())
         .route("/moose-agent", MooseAgentRoutes())
+        .route("/moose-agent-folder", MooseAgentFolderRoutes())
+        .route("/moose-agent-active-folder", MooseAgentActiveFolderRoutes())
+        .route("/tools", ToolsRoutes())
         .route("/agent-instance", AgentInstanceRoutes())
         .route("/tui", TuiRoutes())
         .post(

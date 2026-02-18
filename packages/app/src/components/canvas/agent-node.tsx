@@ -35,8 +35,6 @@ export type AgentNodeProps = {
   instance: AgentInstanceInfo
   definition: AgentDefinitionInfo | undefined
   selected: boolean
-  /** Whether this node is part of a lasso selection or active group chat */
-  groupSelected?: boolean
   gcWarning: boolean
   /** Whether this agent recently completed a task (green glow animation) */
   taskComplete?: boolean
@@ -108,10 +106,9 @@ export const AgentNode: Component<AgentNodeProps> = (props) => {
 
   return (
     <div
-      class={`agent-node ${stateClass()} ${props.selected ? "selected" : ""} ${props.groupSelected ? "group-selected" : ""} ${props.gcWarning ? "gc-warning" : ""} ${props.taskComplete ? "task-complete" : ""} ${spawnEnter() ? "spawn-enter" : ""}`}
+      class={`agent-node ${stateClass()} ${props.selected ? "selected" : ""} ${props.gcWarning ? "gc-warning" : ""} ${props.taskComplete ? "task-complete" : ""} ${spawnEnter() ? "spawn-enter" : ""}`}
       style={{
-        left: `${props.instance.positionX}px`,
-        top: `${props.instance.positionY}px`,
+        transform: `translate3d(${props.instance.positionX}px, ${props.instance.positionY}px, 0)`,
         "--agent-color": color(),
       }}
       onPointerDown={props.onPointerDown}
@@ -168,9 +165,9 @@ export const AgentNode: Component<AgentNodeProps> = (props) => {
           </div>
         </Show>
 
-        {/* Error badge — red "!" above-right of the circle */}
+        {/* Error badge — red "!" above-right of the circle, with tooltip */}
         <Show when={state() === "error"}>
-          <div class="agent-error-badge">!</div>
+          <div class="agent-error-badge" title={props.instance.errorMessage ?? "Unknown error"}>!</div>
         </Show>
 
         {/* Todo progress badge — top-left of circle */}
