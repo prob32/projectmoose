@@ -3,6 +3,7 @@ import path from "path"
 import os from "os"
 import { Config } from "../config/config"
 import { Instance } from "../project/instance"
+import { State } from "../project/state"
 import { NamedError } from "@opencode-ai/util/error"
 import { ConfigMarkdown } from "../config/markdown"
 import { Log } from "../util/log"
@@ -49,7 +50,7 @@ export namespace Skill {
   const OPENCODE_SKILL_GLOB = new Bun.Glob("{skill,skills}/**/SKILL.md")
   const SKILL_GLOB = new Bun.Glob("**/SKILL.md")
 
-  export const state = Instance.state(async () => {
+  const stateInit = async () => {
     const skills: Record<string, Info> = {}
     const dirs = new Set<string>()
 
@@ -172,7 +173,13 @@ export namespace Skill {
       skills,
       dirs: Array.from(dirs),
     }
-  })
+  }
+  export const state = Instance.state(stateInit)
+
+  /** Invalidate the skill cache so newly installed/uninstalled skills are picked up */
+  export function invalidate() {
+    State.invalidate(Instance.directory, stateInit)
+  }
 
   export async function get(name: string) {
     return state().then((x) => x.skills[name])

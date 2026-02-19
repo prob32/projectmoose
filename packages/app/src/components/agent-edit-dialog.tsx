@@ -206,6 +206,11 @@ export const AgentEditDialog: Component<AgentEditDialogProps> = (props) => {
     )
   }
 
+  // ═══ Collapsible sections ═══
+  const [toolsExpanded, setToolsExpanded] = createSignal(false)
+  const [skillsExpanded, setSkillsExpanded] = createSignal(false)
+  const [spawnableExpanded, setSpawnableExpanded] = createSignal(false)
+
   // ═══ Tool Groups — fetched from backend ═══
   const [toolGroups, setToolGroups] = createSignal<Record<string, ToolGroupInfo>>({})
   const [toolGroupsExpanded, setToolGroupsExpanded] = createSignal(false)
@@ -307,21 +312,99 @@ export const AgentEditDialog: Component<AgentEditDialogProps> = (props) => {
     )
   }
 
-  // ═══ Skills — fetched from backend ═══
-  const [availableSkills, setAvailableSkills] = createSignal<{ name: string; description?: string }[]>([])
+  // ═══ Skills — installed + registry ═══
+  type SkillEntry = { name: string; description?: string }
+  type RegistryEntry = { name: string; description: string; tags?: string[]; source: string; installed: boolean }
 
-  createEffect(() => {
+  const [installedSkills, setInstalledSkills] = createSignal<SkillEntry[]>([])
+  const [registrySkills, setRegistrySkills] = createSignal<RegistryEntry[]>([])
+  const [skillSearch, setSkillSearch] = createSignal("")
+  const [installing, setInstalling] = createSignal<string | null>(null)
+
+  function fetchSkills() {
     fetch(`${props.serverUrl}/skill`, {
       headers: { "x-opencode-directory": props.directory },
     })
       .then((r) => r.json())
       .then((data: any[]) => {
-        setAvailableSkills(
+        setInstalledSkills(
           (data ?? []).map((s: any) => ({ name: s.name ?? s.id, description: s.description })),
         )
       })
       .catch(() => {})
+  }
+
+  function fetchRegistry() {
+    fetch(`${props.serverUrl}/skill/registry`, {
+      headers: { "x-opencode-directory": props.directory },
+    })
+      .then((r) => r.json())
+      .then((data: RegistryEntry[]) => setRegistrySkills(data ?? []))
+      .catch(() => {})
+  }
+
+  createEffect(() => {
+    fetchSkills()
+    fetchRegistry()
   })
+
+  const filteredSkills = createMemo(() => {
+    const search = skillSearch().toLowerCase()
+    const installed = installedSkills()
+    const registry = registrySkills()
+    const attachedNames = new Set(form.skills)
+    const installedNames = new Set(installed.map((s) => s.name))
+
+    const match = (s: { name: string; description?: string }) =>
+      !search ||
+      s.name.toLowerCase().includes(search) ||
+      s.description?.toLowerCase().includes(search)
+
+    return {
+      attached: installed.filter((s) => attachedNames.has(s.name)).filter(match),
+      installed: installed.filter((s) => !attachedNames.has(s.name)).filter(match),
+      available: registry.filter((s) => !installedNames.has(s.name)).filter(match),
+    }
+  })
+
+  async function handleInstallSkill(name: string, source: string) {
+    setInstalling(name)
+    try {
+      const res = await fetch(`${props.serverUrl}/skill/install`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-opencode-directory": props.directory,
+        },
+        body: JSON.stringify({ name, source }),
+      })
+      if (res.ok) {
+        fetchSkills()
+        fetchRegistry()
+      }
+    } finally {
+      setInstalling(null)
+    }
+  }
+
+  async function handleUninstallSkill(name: string) {
+    try {
+      const res = await fetch(`${props.serverUrl}/skill/uninstall`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "x-opencode-directory": props.directory,
+        },
+        body: JSON.stringify({ name }),
+      })
+      if (res.ok) {
+        // Remove from form.skills if attached
+        if (form.skills.includes(name)) toggleSkill(name)
+        fetchSkills()
+        fetchRegistry()
+      }
+    } catch {}
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault()
@@ -766,7 +849,20 @@ export const AgentEditDialog: Component<AgentEditDialogProps> = (props) => {
         {/* ═══ Tool Access ═══ */}
         <Show when={toolGroupEntries().length > 0}>
           <div class="flex flex-col gap-1.5">
-            <label class="text-12-medium text-text-strong">Tool Access</label>
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-12-medium text-text-strong hover:text-text-base transition-colors cursor-pointer w-fit"
+              onClick={() => setToolsExpanded(!toolsExpanded())}
+            >
+              <span class="text-[10px] leading-none w-3">{toolsExpanded() ? "▾" : "▸"}</span>
+              Tool Access
+              <span class="text-11-regular text-text-weak font-normal">
+                ({form.toolMode === "all"
+                  ? form.toolDenied.length > 0 ? `all, ${form.toolDenied.length} denied` : "all"
+                  : `${form.toolAllowed.length} allowed`})
+              </span>
+            </button>
+            <Show when={toolsExpanded()}>
             <div class="flex flex-col gap-2 p-2 rounded-md border border-border-base bg-background-base">
               {/* Mode toggle: All / Scoped */}
               <div class="flex items-center gap-4">
@@ -874,56 +970,157 @@ export const AgentEditDialog: Component<AgentEditDialogProps> = (props) => {
                 </div>
               </Show>
             </div>
+            </Show>
           </div>
         </Show>
 
         {/* ═══ Skills ═══ */}
-        <Show when={availableSkills().length > 0}>
+        <Show when={installedSkills().length > 0 || registrySkills().length > 0}>
           <div class="flex flex-col gap-1.5">
-            <label class="text-12-medium text-text-strong">Skills</label>
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-12-medium text-text-strong hover:text-text-base transition-colors cursor-pointer w-fit"
+              onClick={() => setSkillsExpanded(!skillsExpanded())}
+            >
+              <span class="text-[10px] leading-none w-3">{skillsExpanded() ? "▾" : "▸"}</span>
+              Skills
+              <Show when={form.skills.length > 0}>
+                <span class="text-11-regular text-text-weak font-normal">
+                  ({form.skills.length} attached)
+                </span>
+              </Show>
+            </button>
+            <Show when={skillsExpanded()}>
             <div class="flex flex-col gap-1.5 p-2 rounded-md border border-border-base bg-background-base">
               <div class="text-11-regular text-text-weak">
                 Attach skills to pre-load for this agent
               </div>
-              <div class="flex flex-col gap-1">
-                <For each={availableSkills()}>
-                  {(skill) => (
-                    <label
-                      class={checkboxClass}
-                      classList={{
-                        "border-ring-base bg-surface-hover": form.skills.includes(skill.name),
-                        "border-border-base": !form.skills.includes(skill.name),
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.skills.includes(skill.name)}
-                        onChange={() => toggleSkill(skill.name)}
-                        class="accent-ring-base"
-                      />
-                      <div class="flex flex-col gap-0.5">
-                        <span class="text-12-regular text-text-base">{skill.name}</span>
-                        <Show when={skill.description}>
-                          <span class="text-11-regular text-text-weak">{skill.description}</span>
-                        </Show>
+
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search skills..."
+                value={skillSearch()}
+                onInput={(e) => setSkillSearch(e.currentTarget.value)}
+                class="w-full px-2 py-1 text-12-regular rounded border border-border-base bg-background-base text-text-base placeholder:text-text-weak focus:outline-none focus:border-ring-base"
+              />
+
+              {/* Attached group */}
+              <Show when={filteredSkills().attached.length > 0}>
+                <div class="flex flex-col gap-1">
+                  <div class="text-11-medium text-text-weak uppercase tracking-wider">Attached</div>
+                  <For each={filteredSkills().attached}>
+                    {(skill) => (
+                      <label
+                        class={checkboxClass}
+                        classList={{
+                          "border-ring-base bg-surface-hover": true,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={true}
+                          onChange={() => toggleSkill(skill.name)}
+                          class="accent-ring-base"
+                        />
+                        <div class="flex flex-col gap-0.5 flex-1">
+                          <span class="text-12-regular text-text-base">{skill.name}</span>
+                          <Show when={skill.description}>
+                            <span class="text-11-regular text-text-weak">{skill.description}</span>
+                          </Show>
+                        </div>
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              {/* Installed (not attached) group */}
+              <Show when={filteredSkills().installed.length > 0}>
+                <div class="flex flex-col gap-1">
+                  <div class="text-11-medium text-text-weak uppercase tracking-wider">Installed</div>
+                  <For each={filteredSkills().installed}>
+                    {(skill) => (
+                      <label
+                        class={checkboxClass}
+                        classList={{
+                          "border-border-base": true,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          onChange={() => toggleSkill(skill.name)}
+                          class="accent-ring-base"
+                        />
+                        <div class="flex flex-col gap-0.5 flex-1">
+                          <span class="text-12-regular text-text-base">{skill.name}</span>
+                          <Show when={skill.description}>
+                            <span class="text-11-regular text-text-weak">{skill.description}</span>
+                          </Show>
+                        </div>
+                      </label>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              {/* Available from registries */}
+              <Show when={filteredSkills().available.length > 0}>
+                <div class="flex flex-col gap-1">
+                  <div class="text-11-medium text-text-weak uppercase tracking-wider">Available</div>
+                  <For each={filteredSkills().available}>
+                    {(entry) => (
+                      <div
+                        class="flex items-center gap-2 px-2 py-1.5 rounded border border-border-base text-text-base"
+                      >
+                        <div class="flex flex-col gap-0.5 flex-1">
+                          <span class="text-12-regular text-text-base">{entry.name}</span>
+                          <Show when={entry.description}>
+                            <span class="text-11-regular text-text-weak">{entry.description}</span>
+                          </Show>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={installing() === entry.name}
+                          onClick={() => handleInstallSkill(entry.name, entry.source)}
+                          class="shrink-0 px-2 py-0.5 text-11-medium rounded border border-border-base bg-background-base text-text-base hover:bg-surface-hover disabled:opacity-50 transition-colors"
+                        >
+                          {installing() === entry.name ? "Installing..." : "Install"}
+                        </button>
                       </div>
-                    </label>
-                  )}
-                </For>
-              </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
               <Show when={form.skills.length > 0}>
                 <div class="text-11-regular text-text-weak pt-1 border-t border-border-base">
                   Selected: {form.skills.join(", ")}
                 </div>
               </Show>
             </div>
+            </Show>
           </div>
         </Show>
 
         {/* ═══ Spawnable Agents Configuration ═══ */}
         <Show when={otherDefinitions().length > 0}>
           <div class="flex flex-col gap-1.5">
-            <label class="text-12-medium text-text-strong">Spawnable Agents</label>
+            <button
+              type="button"
+              class="flex items-center gap-1.5 text-12-medium text-text-strong hover:text-text-base transition-colors cursor-pointer w-fit"
+              onClick={() => setSpawnableExpanded(!spawnableExpanded())}
+            >
+              <span class="text-[10px] leading-none w-3">{spawnableExpanded() ? "▾" : "▸"}</span>
+              Spawnable Agents
+              <Show when={form.spawnableAgents.length > 0}>
+                <span class="text-11-regular text-text-weak font-normal">
+                  ({form.spawnableAgents.length} selected)
+                </span>
+              </Show>
+            </button>
+            <Show when={spawnableExpanded()}>
             <div class="flex flex-col gap-1.5 p-2 rounded-md border border-border-base bg-background-base">
               <For each={otherDefinitions()}>
                 {(def) => (
@@ -965,6 +1162,7 @@ export const AgentEditDialog: Component<AgentEditDialogProps> = (props) => {
               </Show>
             </div>
             <div class="text-11-regular text-text-weak">Select which agent types this agent can spawn as children</div>
+            </Show>
           </div>
         </Show>
 

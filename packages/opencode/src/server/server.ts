@@ -40,6 +40,7 @@ import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
 import { GlobalRoutes } from "./routes/global"
 import { MooseAgentRoutes, MooseAgentFolderRoutes, MooseAgentActiveFolderRoutes, ToolsRoutes } from "./routes/moose-agent"
+import { SkillRegistryRoutes } from "./routes/skill"
 import { AgentInstanceRoutes } from "./routes/agent-instance"
 import { MDNS } from "./mdns"
 
@@ -241,6 +242,7 @@ export namespace Server {
         .route("/moose-agent-active-folder", MooseAgentActiveFolderRoutes())
         .route("/tools", ToolsRoutes())
         .route("/agent-instance", AgentInstanceRoutes())
+        .route("/skill", SkillRegistryRoutes())
         .route("/tui", TuiRoutes())
         .post(
           "/instance/dispose",

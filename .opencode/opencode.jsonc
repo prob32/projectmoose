@@ -13,4 +13,9 @@
     "github-triage": false,
     "github-pr-search": false,
   },
+  "skills": {
+    "paths": [
+      "G:/projectMoose/anthropic-skills/skills"
+    ]
+  },
 }
