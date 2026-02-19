@@ -101,18 +101,23 @@ Agent definitions are organized into folders in `~/.config/opencode/moose-agents
     {
       "id": "default",
       "name": "Default",
+      "description": "Traditional dev agents — architect, code, ask, debug, review, orchestrate",
+      "icon": "terminal",
       "color": "#64b5f6",
       "agents": [
         {
           "id": "architect",
           "name": "Architect",
-          "description": "High-level orchestrator for complex tasks",
-          "color": "#8B5CF6",
+          "description": "Plan and design before implementation",
+          "color": "#FF9800",
+          "prompt": "You are an experienced technical leader...",
           "role": "orchestrator",
           "model": {
             "providerID": "openrouter",
             "modelID": "anthropic/claude-sonnet-4"
           },
+          "permissionMode": "plan",
+          "thinking": { "effort": "none" },
           "tools": {
             "mode": "scoped",
             "allow": ["read", "browser", "planning", "interaction", "skills", "task"]
@@ -121,13 +126,69 @@ Agent definitions are organized into folders in `~/.config/opencode/moose-agents
             "agents": ["coder", "ask", "debugger"],
             "limit": "auto"
           },
-          "idle_timeout": 300
+          "idle_timeout": 0,
+          "order": 0
+        },
+        {
+          "id": "coder",
+          "name": "Coder",
+          "description": "Write, modify, and refactor code",
+          "color": "#4CAF50",
+          "prompt": "You are a highly skilled software engineer...",
+          "role": "coder",
+          "model": {
+            "providerID": "openrouter",
+            "modelID": "openai/gpt-5.2-codex"
+          },
+          "permissionMode": "build",
+          "tools": {
+            "mode": "scoped",
+            "allow": ["read", "edit", "command", "planning", "interaction", "skills", "browser"]
+          },
+          "skills": ["frontend-design"],
+          "idle_timeout": 90,
+          "order": 1
         }
       ]
     }
   ]
 }
 ```
+
+#### Agent Definition Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `string` | yes | Unique identifier within the folder |
+| `name` | `string` | yes | Display name |
+| `description` | `string` | no | Short description shown in sidebar |
+| `color` | `string` | yes | Hex color (`#RRGGBB`) for canvas node |
+| `prompt` | `string` | yes | System prompt defining agent behavior |
+| `role` | `string` | no | Semantic role (e.g., `orchestrator`, `coder`, `researcher`, `debugger`) |
+| `model` | `{ providerID, modelID }` | no | LLM model override (inherits parent's model if omitted) |
+| `permissionMode` | `"build" \| "plan"` | no | `build` = full edit access, `plan` = read-only (default: `build`) |
+| `thinking` | `{ budget?, effort? }` | no | Extended thinking config |
+| `tools` | `{ mode, allow?, deny? }` | no | Tool scoping — see below |
+| `skills` | `string[]` | no | Specific skills this agent can load (e.g., `["frontend-design", "commit"]`) |
+| `mcp` | `{ servers?, deny? }` | no | MCP server access control |
+| `spawnable` | `{ agents[], limit }` | no | Which child agents this agent can spawn (makes it an orchestrator) |
+| `idle_timeout` | `number` | no | Seconds before GC cleanup (`0` = never, default: `120`) |
+| `order` | `number` | no | Sort order in sidebar (default: `0`) |
+
+#### Tool Scoping
+
+`tools.mode` controls how tools are granted:
+- `"all"` (default) — agent has all tools, minus any in `tools.deny`
+- `"scoped"` — agent only has tools from groups listed in `tools.allow`
+
+Available tool groups: `read`, `edit`, `command`, `browser`, `task`, `planning`, `interaction`, `skills`
+
+#### Skills vs Tool Groups
+
+- **`tools.allow: ["skills"]`** grants the agent the _ability_ to invoke skills (the `skill` tool)
+- **`skills: ["frontend-design"]`** controls _which specific skills_ the agent can load
+
+Both are needed for an agent to use a specific skill.
 
 Default agent presets are seeded on first run. Switch between folders using the sidebar folder switcher.
 

@@ -334,10 +334,15 @@ When `tools.mode: "scoped"`, only tools from allowed groups are available. When 
   },
   "permissionMode": "build",
   "thinking": { "effort": "medium" },
+  "mcp": {
+    "servers": ["codegraph"],
+    "deny": []
+  },
   "tools": {
     "mode": "scoped",
-    "allow": ["read", "edit", "command"]
+    "allow": ["read", "edit", "command", "planning", "interaction", "skills", "browser"]
   },
+  "skills": ["frontend-design"],
   "spawnable": {
     "agents": ["deer"],
     "limit": 5
@@ -346,6 +351,27 @@ When `tools.mode: "scoped"`, only tools from allowed groups are available. When 
   "order": 1
 }
 ```
+
+All fields from `schema.ts` → `AgentDefinitionInfo`:
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `id` | `string` | — | Required. Unique within the folder |
+| `name` | `string` | — | Required. Display name |
+| `description` | `string?` | — | Shown in sidebar |
+| `color` | `string` | — | Required. Hex `#RRGGBB` |
+| `prompt` | `string` | — | Required. System prompt |
+| `role` | `string?` | — | Semantic role hint |
+| `model` | `{ providerID, modelID }?` | parent's model | LLM override |
+| `temperature` | `number?` | — | Sampling temperature |
+| `permissionMode` | `"build" \| "plan"` | `"build"` | `plan` denies edit tools |
+| `thinking` | `{ budget?, effort? }?` | — | Extended thinking config |
+| `mcp` | `{ servers?, deny? }?` | — | MCP server access |
+| `tools` | `{ mode, allow?, deny? }?` | `mode: "all"` | Tool scoping (see Tool Scoping section) |
+| `skills` | `string[]?` | — | Specific skills the agent can load |
+| `spawnable` | `{ agents[], limit }?` | — | Makes agent an orchestrator |
+| `idle_timeout` | `number` | `120` | Seconds before GC (`0` = never) |
+| `order` | `number` | `0` | Sidebar sort order |
 
 ### Folder Config (`moose-agents.json`)
 
