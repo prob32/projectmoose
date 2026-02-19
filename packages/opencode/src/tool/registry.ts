@@ -57,8 +57,8 @@ export const TOOL_GROUPS: Record<string, { label: string; tools: Array<{ id: str
   browser: {
     label: "Web Access",
     tools: [
-      { id: "web_fetch", name: "Web Fetch", description: "Fetch URL content" },
-      { id: "web_search", name: "Web Search", description: "Search the web" },
+      { id: "webfetch", name: "Web Fetch", description: "Fetch URL content" },
+      { id: "websearch", name: "Web Search", description: "Search the web" },
     ],
   },
   task: {

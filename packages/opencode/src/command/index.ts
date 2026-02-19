@@ -123,6 +123,8 @@ export namespace Command {
     }
 
     // Add skills as invokable commands
+    // subtask: false prevents spawning a child agent — skill content should be
+    // injected directly into the current agent's conversation context.
     for (const skill of await Skill.all()) {
       // Skip if a command with this name already exists
       if (result[skill.name]) continue
@@ -130,6 +132,7 @@ export namespace Command {
         name: skill.name,
         description: skill.description,
         source: "skill",
+        subtask: false,
         get template() {
           return skill.content
         },

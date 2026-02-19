@@ -27,8 +27,8 @@ const TOOL_LABELS: Record<string, string> = {
   task: "Subagent Task",
   todoread: "Read Todos",
   todowrite: "Write Todos",
-  web_search: "Web Search",
-  web_fetch: "Web Fetch",
+  websearch: "Web Search",
+  webfetch: "Web Fetch",
 }
 
 /** Smart scroll container: auto-scrolls only if user is at bottom, shows scroll-to-bottom button */

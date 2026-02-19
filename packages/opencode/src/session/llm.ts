@@ -22,6 +22,7 @@ import { SystemPrompt } from "./system"
 import { Flag } from "@/flag/flag"
 import { PermissionNext } from "@/permission/next"
 import { Auth } from "@/auth"
+import { Skill } from "@/skill"
 
 export namespace LLM {
   const log = Log.create({ service: "llm" })
@@ -84,6 +85,31 @@ export namespace LLM {
         .filter((x) => x)
         .join("\n"),
     )
+
+    // Auto-inject attached skills into the system prompt.
+    // When an agent has skills: ["frontend-design", ...], load the skill content
+    // eagerly so the agent has domain-specific instructions from the start.
+    if (input.agent.skills?.length) {
+      const skillContents = await Promise.all(
+        input.agent.skills.map(async (name) => {
+          const skill = await Skill.get(name)
+          if (!skill) return undefined
+          return `<skill_content name="${skill.name}">\n# Skill: ${skill.name}\n\n${skill.content.trim()}\n</skill_content>`
+        }),
+      )
+      const loaded = skillContents.filter(Boolean)
+      if (loaded.length > 0) {
+        system.push(
+          [
+            "<attached_skills>",
+            "The following skills are pre-loaded for this agent. Follow these instructions when relevant:",
+            "",
+            ...loaded,
+            "</attached_skills>",
+          ].join("\n"),
+        )
+      }
+    }
 
     const header = system[0]
     const original = clone(system)

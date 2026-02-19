@@ -21,6 +21,7 @@ import { Global } from "@/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
+import { expandToolGroups } from "../tool/registry"
 
 export namespace Agent {
   export const Info = z
@@ -44,6 +45,7 @@ export namespace Agent {
       prompt: z.string().optional(),
       options: z.record(z.string(), z.any()),
       steps: z.number().int().positive().optional(),
+      skills: z.array(z.string()).optional(),
     })
     .meta({
       ref: "Agent",
@@ -274,6 +276,26 @@ export namespace Agent {
               }
             : {}
 
+        // Build tool scoping permissions from the definition's tools config
+        // When mode="scoped", only tools in the allow list (expanded from groups) are permitted.
+        // When mode="all", tools in the deny list are denied.
+        const toolPerms: Record<string, "allow" | "deny"> = {}
+        if (def.tools?.mode === "scoped" && def.tools.allow?.length) {
+          const allowed = expandToolGroups(def.tools.allow)
+          // Deny everything by default, then allow specific tools
+          toolPerms["*"] = "deny"
+          for (const toolId of allowed) {
+            toolPerms[toolId] = "allow"
+          }
+          // Always allow the "invalid" meta-tool
+          toolPerms["invalid"] = "allow"
+        } else if (def.tools?.mode === "all" && def.tools.deny?.length) {
+          const denied = expandToolGroups(def.tools.deny)
+          for (const toolId of denied) {
+            toolPerms[toolId] = "deny"
+          }
+        }
+
         // Build thinking/reasoning options from the definition
         const thinkingOptions: Record<string, any> = {}
         if (def.thinking) {
@@ -296,6 +318,7 @@ export namespace Agent {
           permission: PermissionNext.merge(
             defaults,
             PermissionNext.fromConfig({
+              ...toolPerms,
               ...orchestratorPerms,
               ...mcpPerms,
               ...planPerms,
@@ -303,6 +326,7 @@ export namespace Agent {
             user,
           ),
           options: thinkingOptions,
+          skills: def.skills?.length ? def.skills : undefined,
           native: false,
         }
       }
