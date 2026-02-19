@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Moose — Architecture Diagram</title>
+<style>
+  @page { size: landscape; margin: 0.5in; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page-break { page-break-before: always; }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e6;
+    line-height: 1.5;
+  }
+
+  .page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px;
+  }
+
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #8B4513, #FF9800, #4CAF50);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+  }
+
+  .subtitle {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #ccc;
+    margin: 36px 0 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #222;
+  }
+
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: #aaa;
+    margin: 24px 0 12px;
+  }
+
+  /* ===== System Overview Diagram ===== */
+  .system-diagram {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr 60px 1fr;
+    gap: 0;
+    align-items: start;
+    margin: 24px 0;
+  }
+
+  .layer {
+    background: #111118;
+    border: 1px solid #252530;
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .layer-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666;
+    margin-bottom: 14px;
+  }
+
+  .arrow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding-top: 40px;
+  }
+
+  .arrow-col svg { width: 40px; height: 40px; }
+  .arrow-col .arrow-label {
+    font-size: 10px;
+    color: #555;
+    text-align: center;
+    margin-top: 4px;
+  }
+
+  /* ===== Module boxes ===== */
+  .module {
+    background: #16161e;
+    border: 1px solid #2a2a38;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+
+  .module:hover { border-color: #444; }
+
+  .module-name {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'Consolas', 'Fira Code', monospace;
+  }
+
+  .module-desc {
+    font-size: 11px;
+    color: #777;
+    margin-top: 2px;
+  }
+
+  /* Color accents for different domains */
+  .module.schema { border-left: 3px solid #FF9800; }
+  .module.schema .module-name { color: #FF9800; }
+  .module.definition { border-left: 3px solid #4CAF50; }
+  .module.definition .module-name { color: #4CAF50; }
+  .module.instance { border-left: 3px solid #2196F3; }
+  .module.instance .module-name { color: #2196F3; }
+  .module.layout { border-left: 3px solid #9C27B0; }
+  .module.layout .module-name { color: #9C27B0; }
+  .module.spawn { border-left: 3px solid #E91E63; }
+  .module.spawn .module-name { color: #E91E63; }
+  .module.comms { border-left: 3px solid #00BCD4; }
+  .module.comms .module-name { color: #00BCD4; }
+  .module.events { border-left: 3px solid #FF5722; }
+  .module.events .module-name { color: #FF5722; }
+  .module.gc { border-left: 3px solid #607D8B; }
+  .module.gc .module-name { color: #607D8B; }
+  .module.preset { border-left: 3px solid #795548; }
+  .module.preset .module-name { color: #795548; }
+  .module.bridge { border-left: 3px solid #FFEB3B; }
+  .module.bridge .module-name { color: #FFEB3B; }
+  .module.route { border-left: 3px solid #8BC34A; }
+  .module.route .module-name { color: #8BC34A; }
+  .module.tool { border-left: 3px solid #03A9F4; }
+  .module.tool .module-name { color: #03A9F4; }
+  .module.frontend { border-left: 3px solid #FF4081; }
+  .module.frontend .module-name { color: #FF4081; }
+
+  /* ===== Data flow diagram ===== */
+  .flow-diagram {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 24px 0;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .flow-node {
+    background: #16161e;
+    border: 1px solid #2a2a38;
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    position: relative;
+  }
+
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: #444;
+    padding: 4px 0;
+  }
+
+  .flow-arrow .line {
+    width: 2px;
+    height: 20px;
+    background: #333;
+  }
+
+  .flow-arrow .tip {
+    font-size: 10px;
+    color: #555;
+  }
+
+  .flow-arrow-label {
+    font-size: 10px;
+    color: #666;
+    padding: 0 8px;
+  }
+
+  /* ===== Hierarchy diagram ===== */
+  .hierarchy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin: 24px 0;
+  }
+
+  .h-row {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .h-node {
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    min-width: 120px;
+    position: relative;
+  }
+
+  .h-connector {
+    width: 2px;
+    height: 16px;
+    background: #333;
+    margin: 0 auto;
+  }
+
+  .h-connector-wide {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    position: relative;
+  }
+
+  .h-connector-wide::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 10%;
+    right: 10%;
+    height: 2px;
+    background: #333;
+  }
+
+  /* ===== Module grid ===== */
+  .module-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .module-card {
+    background: #111118;
+    border: 1px solid #252530;
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .module-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'Consolas', monospace;
+    margin-bottom: 8px;
+  }
+
+  .module-card-list {
+    list-style: none;
+    font-size: 12px;
+    color: #888;
+  }
+
+  .module-card-list li {
+    padding: 3px 0;
+    border-bottom: 1px solid #1a1a22;
+  }
+
+  .module-card-list li:last-child { border-bottom: none; }
+
+  .module-card-list code {
+    color: #aaa;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+  }
+
+  /* ===== Event table ===== */
+  .event-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+
+  .event-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: #16161e;
+    color: #999;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #252530;
+  }
+
+  .event-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #1a1a22;
+    color: #bbb;
+  }
+
+  .event-table code {
+    font-family: 'Consolas', monospace;
+    font-size: 12px;
+    color: #FF9800;
+    background: #1a1510;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  /* ===== Agent cards ===== */
+  .agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .agent-card {
+    border-radius: 10px;
+    padding: 12px 16px;
+    background: #111118;
+    border: 1px solid #252530;
+  }
+
+  .agent-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .agent-name {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .agent-role {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  .agent-meta {
+    font-size: 10px;
+    color: #555;
+    margin-top: 6px;
+    font-family: 'Consolas', monospace;
+  }
+
+  /* ===== Tool groups ===== */
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .tool-group {
+    background: #111118;
+    border: 1px solid #252530;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .tool-group-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #aaa;
+    margin-bottom: 6px;
+  }
+
+  .tool-tag {
+    display: inline-block;
+    font-size: 10px;
+    background: #1a1a25;
+    color: #888;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin: 2px;
+    font-family: 'Consolas', monospace;
+  }
+
+  /* ===== API routes ===== */
+  .route-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin: 16px 0;
+  }
+
+  .route-table th {
+    text-align: left;
+    padding: 6px 10px;
+    background: #16161e;
+    color: #888;
+    font-weight: 600;
+    border-bottom: 2px solid #252530;
+  }
+
+  .route-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #1a1a22;
+  }
+
+  .method {
+    font-family: 'Consolas', monospace;
+    font-weight: 600;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+
+  .method.get { color: #4CAF50; background: #0a1a0a; }
+  .method.post { color: #FF9800; background: #1a150a; }
+  .method.put { color: #2196F3; background: #0a101a; }
+  .method.delete { color: #E91E63; background: #1a0a10; }
+  .method.patch { color: #9C27B0; background: #150a1a; }
+
+  .route-path {
+    font-family: 'Consolas', monospace;
+    color: #ccc;
+  }
+
+  /* ===== Footer ===== */
+  .footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid #222;
+    color: #444;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  /* ===== Spawn flow ===== */
+  .spawn-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+
+  .spawn-step {
+    flex: 1;
+    min-width: 130px;
+    background: #111118;
+    border: 1px solid #252530;
+    padding: 12px;
+    text-align: center;
+    position: relative;
+  }
+
+  .spawn-step:first-child { border-radius: 10px 0 0 10px; }
+  .spawn-step:last-child { border-radius: 0 10px 10px 0; }
+
+  .spawn-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-left: 8px solid #333;
+    z-index: 1;
+  }
+
+  .spawn-step-num {
+    font-size: 10px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+
+  .spawn-step-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ccc;
+  }
+
+  .spawn-step-desc {
+    font-size: 10px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  /* ===== Legend ===== */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    padding: 12px;
+    background: #111118;
+    border-radius: 8px;
+    border: 1px solid #252530;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: #888;
+  }
+
+  .legend-bar {
+    width: 3px;
+    height: 16px;
+    border-radius: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<!-- ===== HEADER ===== -->
+<h1>Project Moose</h1>
+<p class="subtitle">Multi-agent orchestration layer for OpenCode &mdash; Architecture Reference (v0.3.1)</p>
+
+<!-- ===== COLOR LEGEND ===== -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-bar" style="background:#FF9800"></div> Schema</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#4CAF50"></div> Definition</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#2196F3"></div> Instance</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#9C27B0"></div> Layout</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#E91E63"></div> Spawn</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#00BCD4"></div> Communication</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#FF5722"></div> Events</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#607D8B"></div> GC</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#FFEB3B"></div> Bridge</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#8BC34A"></div> Routes</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#03A9F4"></div> Tools</div>
+  <div class="legend-item"><div class="legend-bar" style="background:#FF4081"></div> Frontend</div>
+</div>
+
+<!-- ===== SYSTEM LAYERS ===== -->
+<h2>System Architecture</h2>
+
+<div class="system-diagram">
+  <!-- Frontend Layer -->
+  <div class="layer">
+    <div class="layer-title">Frontend (Solid.js)</div>
+    <div class="module frontend">
+      <div class="module-name">sidebar-agents.tsx</div>
+      <div class="module-desc">Agent list, folders, CRUD dialogs</div>
+    </div>
+    <div class="module frontend">
+      <div class="module-name">canvas/agent-canvas.tsx</div>
+      <div class="module-desc">Pan/zoom canvas container</div>
+    </div>
+    <div class="module frontend">
+      <div class="module-name">canvas/agent-node.tsx</div>
+      <div class="module-desc">Agent node rendering + state colors</div>
+    </div>
+    <div class="module frontend">
+      <div class="module-name">canvas/canvas-physics.ts</div>
+      <div class="module-desc">Client-side smooth animation</div>
+    </div>
+    <div class="module frontend">
+      <div class="module-name">context/canvas.tsx</div>
+      <div class="module-desc">Reactive store + SSE handlers</div>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div class="arrow-col">
+    <svg viewBox="0 0 40 40">
+      <line x1="10" y1="20" x2="28" y2="20" stroke="#444" stroke-width="2"/>
+      <polygon points="28,15 36,20 28,25" fill="#444"/>
+    </svg>
+    <div class="arrow-label">HTTP API<br/>+ SSE</div>
+    <svg viewBox="0 0 40 40" style="transform:scaleX(-1)">
+      <line x1="10" y1="20" x2="28" y2="20" stroke="#444" stroke-width="2"/>
+      <polygon points="28,15 36,20 28,25" fill="#444"/>
+    </svg>
+  </div>
+
+  <!-- Server Layer -->
+  <div class="layer">
+    <div class="layer-title">Server (Hono)</div>
+    <div class="module route">
+      <div class="module-name">routes/moose-agent.ts</div>
+      <div class="module-desc">REST endpoints for agents, folders, tools</div>
+    </div>
+    <div class="module bridge">
+      <div class="module-name">agent/agent.ts</div>
+      <div class="module-desc">Bridge: Moose defs &rarr; OpenCode agents</div>
+    </div>
+    <div class="module tool">
+      <div class="module-name">tool/task.ts</div>
+      <div class="module-desc">Task tool: delegation + session creation</div>
+    </div>
+    <div class="module tool">
+      <div class="module-name">tool/registry.ts</div>
+      <div class="module-desc">Tool groups &amp; scoping expansion</div>
+    </div>
+  </div>
+
+  <!-- Arrow -->
+  <div class="arrow-col">
+    <svg viewBox="0 0 40 40">
+      <line x1="10" y1="20" x2="28" y2="20" stroke="#444" stroke-width="2"/>
+      <polygon points="28,15 36,20 28,25" fill="#444"/>
+    </svg>
+    <div class="arrow-label">imports</div>
+    <svg viewBox="0 0 40 40" style="transform:scaleX(-1)">
+      <line x1="10" y1="20" x2="28" y2="20" stroke="#444" stroke-width="2"/>
+      <polygon points="28,15 36,20 28,25" fill="#444"/>
+    </svg>
+  </div>
+
+  <!-- Moose Core Layer -->
+  <div class="layer">
+    <div class="layer-title">Moose Core (agent/moose/)</div>
+    <div class="module schema">
+      <div class="module-name">schema.ts</div>
+      <div class="module-desc">All Zod schemas (single source of truth)</div>
+    </div>
+    <div class="module definition">
+      <div class="module-name">definition.ts</div>
+      <div class="module-desc">Agent &amp; folder CRUD &rarr; JSON config</div>
+    </div>
+    <div class="module instance">
+      <div class="module-name">instance.ts</div>
+      <div class="module-desc">Runtime instances &rarr; SQLite</div>
+    </div>
+    <div class="module layout">
+      <div class="module-name">layout.ts</div>
+      <div class="module-desc">Force-directed repulsion + arc layout</div>
+    </div>
+    <div class="module spawn">
+      <div class="module-name">spawn.ts</div>
+      <div class="module-desc">Spawn validation, limits, detection</div>
+    </div>
+    <div class="module comms">
+      <div class="module-name">communication.ts</div>
+      <div class="module-desc">Parent-child messaging</div>
+    </div>
+    <div class="module events">
+      <div class="module-name">events.ts</div>
+      <div class="module-desc">6 BusEvent definitions</div>
+    </div>
+    <div class="module gc">
+      <div class="module-name">gc.ts</div>
+      <div class="module-desc">Idle timeout &amp; orphan cleanup</div>
+    </div>
+    <div class="module preset">
+      <div class="module-name">presets/default.ts</div>
+      <div class="module-desc">6 default agents</div>
+    </div>
+    <div class="module preset">
+      <div class="module-name">presets/moose-herd.ts</div>
+      <div class="module-desc">7 moose herd agents</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TASK DELEGATION FLOW ===== -->
+<h2>Task Delegation Flow</h2>
+
+<div class="spawn-flow">
+  <div class="spawn-step">
+    <div class="spawn-step-num">1</div>
+    <div class="spawn-step-title">Orchestrator calls Task tool</div>
+    <div class="spawn-step-desc">LLM decides to delegate</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">2</div>
+    <div class="spawn-step-title">Permission check</div>
+    <div class="spawn-step-desc">PermissionNext.evaluate()</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">3</div>
+    <div class="spawn-step-title">Spawn validation</div>
+    <div class="spawn-step-desc">isSpawnAllowed() + limit check</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">4</div>
+    <div class="spawn-step-title">Find or create instance</div>
+    <div class="spawn-step-desc">Reuse idle child or create new</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">5</div>
+    <div class="spawn-step-title">Create session</div>
+    <div class="spawn-step-desc">Session.create() with scoped perms</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">6</div>
+    <div class="spawn-step-title">Redistribute layout</div>
+    <div class="spawn-step-desc">Arc distribution + repel overlaps</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">7</div>
+    <div class="spawn-step-title">Execute prompt</div>
+    <div class="spawn-step-desc">SessionPrompt.prompt() with child model</div>
+  </div>
+  <div class="spawn-step">
+    <div class="spawn-step-num">8</div>
+    <div class="spawn-step-title">Return result</div>
+    <div class="spawn-step-desc">Set idle + complete todos</div>
+  </div>
+</div>
+
+<!-- ===== MOOSE HERD HIERARCHY ===== -->
+<h2>Moose Herd Agent Hierarchy</h2>
+
+<div class="hierarchy">
+  <div class="h-row">
+    <div class="h-node" style="background:#8B4513; color:white; border:2px solid #A0522D">
+      Bull Moose<br><span style="font-size:10px;opacity:0.8">orchestrator</span>
+    </div>
+  </div>
+  <div class="h-connector" style="height:20px"></div>
+  <div class="h-row">
+    <div class="h-node" style="background:#1a1520; color:#FF6B35; border:1px solid #FF6B35">
+      Junior Moose<br><span style="font-size:10px;opacity:0.6">sub-orchestrator</span>
+    </div>
+    <div class="h-node" style="background:#0f1520; color:#2196F3; border:1px solid #2196F3">
+      Smart Moose<br><span style="font-size:10px;opacity:0.6">researcher</span>
+    </div>
+    <div class="h-node" style="background:#1a0f15; color:#E91E63; border:1px solid #E91E63">
+      Debug Moose<br><span style="font-size:10px;opacity:0.6">debugger</span>
+    </div>
+    <div class="h-node" style="background:#150f1a; color:#9C27B0; border:1px solid #9C27B0">
+      Trail Moose<br><span style="font-size:10px;opacity:0.6">general</span>
+    </div>
+    <div class="h-node" style="background:#0f1a1a; color:#00BCD4; border:1px solid #00BCD4">
+      Scout Moose<br><span style="font-size:10px;opacity:0.6">explorer</span>
+    </div>
+  </div>
+  <div style="display:flex;gap:16px;justify-content:center;margin-top:-4px">
+    <div class="h-connector" style="height:20px;margin-left:-370px"></div>
+  </div>
+  <div class="h-row" style="margin-left:-370px">
+    <div class="h-node" style="background:#0f1a0f; color:#4CAF50; border:1px solid #4CAF50; min-width:100px">
+      Deer<br><span style="font-size:10px;opacity:0.6">coder (x5 max)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODULE DETAIL CARDS ===== -->
+<h2 class="page-break">Module Details</h2>
+
+<div class="module-grid">
+  <div class="module-card" style="border-top: 3px solid #FF9800">
+    <div class="module-card-title" style="color:#FF9800">schema.ts</div>
+    <ul class="module-card-list">
+      <li><code>AgentDefinitionInfo</code> — id, name, prompt, model, tools, spawnable</li>
+      <li><code>AgentFolder</code> — id, name, color, agents[]</li>
+      <li><code>AgentFolderConfig</code> — activeFolder, folders[]</li>
+      <li><code>AgentInstanceState</code> — idle | working | error | question | spawning</li>
+      <li><code>AgentInstanceInfo</code> — id, position, state, session, parent</li>
+      <li><code>AgentMessageType</code> — question | scope_request | answer | result</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #4CAF50">
+    <div class="module-card-title" style="color:#4CAF50">definition.ts</div>
+    <ul class="module-card-list">
+      <li><code>readConfig()</code> — Read &amp; validate moose-agents.json</li>
+      <li><code>writeConfig()</code> — Write + publish Bus event</li>
+      <li><code>list/get/create/update/remove</code> — Agent CRUD</li>
+      <li><code>listFolders/createFolder/...</code> — Folder CRUD</li>
+      <li><code>setActiveFolder()</code> — Switch active folder</li>
+      <li><code>seedDefaults()</code> — First-run preset seeding</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #2196F3">
+    <div class="module-card-title" style="color:#2196F3">instance.ts</div>
+    <ul class="module-card-list">
+      <li><code>create/get/remove</code> — SQLite CRUD via Drizzle</li>
+      <li><code>move()</code> — Update x, y position</li>
+      <li><code>setState()</code> — Transition + BusEvent</li>
+      <li><code>spawn()</code> — Full validated spawn flow</li>
+      <li><code>findBySessionID()</code> — Reverse lookup</li>
+      <li><code>pickUniqueName()</code> — Random from 64-name library</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #9C27B0">
+    <div class="module-card-title" style="color:#9C27B0">layout.ts</div>
+    <ul class="module-card-list">
+      <li><code>LAYOUT</code> — Constants (100px min, 160px spawn, 144&deg; arc)</li>
+      <li><code>repelOverlaps()</code> — 3-iteration force-directed push</li>
+      <li><code>redistributeSiblings()</code> — Even arc distribution</li>
+      <li>Callback injection to avoid circular imports</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #E91E63">
+    <div class="module-card-title" style="color:#E91E63">spawn.ts</div>
+    <ul class="module-card-list">
+      <li><code>isSpawnAllowed()</code> — Check spawnable.agents[]</li>
+      <li><code>checkSpawnLimit()</code> — Numeric or auto (max 20)</li>
+      <li><code>calculateChildPosition()</code> — Initial placement</li>
+      <li><code>isOrchestrator()</code> — Has spawnable agents?</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #00BCD4">
+    <div class="module-card-title" style="color:#00BCD4">communication.ts</div>
+    <ul class="module-card-list">
+      <li><code>send()</code> — Typed parent-child messages</li>
+      <li>Child &rarr; Parent: question, scope_request, result</li>
+      <li>Parent &rarr; Child: answer, result</li>
+      <li><code>escalate()</code> — Route questions up hierarchy</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #FF5722">
+    <div class="module-card-title" style="color:#FF5722">events.ts</div>
+    <ul class="module-card-list">
+      <li><code>Spawned</code> — New instance created</li>
+      <li><code>StateChanged</code> — idle/working/error/question</li>
+      <li><code>Deleted</code> — Instance removed</li>
+      <li><code>Moved</code> — Position changed</li>
+      <li><code>Message</code> — Inter-agent message</li>
+      <li><code>GCWarning</code> — Approaching timeout</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #607D8B">
+    <div class="module-card-title" style="color:#607D8B">gc.ts</div>
+    <ul class="module-card-list">
+      <li>30-second sweep interval</li>
+      <li>Top-level agents never deleted</li>
+      <li><code>idle_timeout: 0</code> &rarr; immortal</li>
+      <li>Cascade delete: children first</li>
+      <li>Orphan session cleanup (60s grace)</li>
+      <li>GCWarning 30s before deletion</li>
+    </ul>
+  </div>
+
+  <div class="module-card" style="border-top: 3px solid #FFEB3B">
+    <div class="module-card-title" style="color:#FFEB3B">agent.ts (Bridge)</div>
+    <ul class="module-card-list">
+      <li><code>translateMooseToAgent()</code> — Moose &rarr; OpenCode</li>
+      <li><code>buildToolPerms()</code> — Expand tool groups</li>
+      <li><code>buildOrchestratorPerms()</code> — task/todo/plan</li>
+      <li><code>buildPlanPerms()</code> — Plan mode: deny edits</li>
+      <li><code>buildThinkingOptions()</code> — Budget/effort</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== TOOL GROUPS ===== -->
+<h2>Tool Groups</h2>
+
+<div class="tool-grid">
+  <div class="tool-group">
+    <div class="tool-group-name">read — Read &amp; Search</div>
+    <span class="tool-tag">read</span>
+    <span class="tool-tag">glob</span>
+    <span class="tool-tag">grep</span>
+    <span class="tool-tag">codesearch</span>
+    <span class="tool-tag">lsp</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">edit — Edit &amp; Write</div>
+    <span class="tool-tag">edit</span>
+    <span class="tool-tag">write</span>
+    <span class="tool-tag">apply_patch</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">command — Shell</div>
+    <span class="tool-tag">bash</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">browser — Web Access</div>
+    <span class="tool-tag">webfetch</span>
+    <span class="tool-tag">websearch</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">task — Subtasks</div>
+    <span class="tool-tag">task</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">planning — Planning</div>
+    <span class="tool-tag">todoread</span>
+    <span class="tool-tag">todowrite</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">interaction — Interaction</div>
+    <span class="tool-tag">question</span>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-name">skills — Skills</div>
+    <span class="tool-tag">skill</span>
+  </div>
+</div>
+
+<!-- ===== API ROUTES ===== -->
+<h2>API Routes</h2>
+
+<table class="route-table">
+  <thead>
+    <tr><th>Method</th><th>Route</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><span class="method get">GET</span></td><td class="route-path">/moose-agent</td><td>List active folder's agents</td></tr>
+    <tr><td><span class="method get">GET</span></td><td class="route-path">/moose-agent/:id</td><td>Get agent by ID</td></tr>
+    <tr><td><span class="method post">POST</span></td><td class="route-path">/moose-agent</td><td>Create agent definition</td></tr>
+    <tr><td><span class="method put">PUT</span></td><td class="route-path">/moose-agent/:id</td><td>Update agent definition</td></tr>
+    <tr><td><span class="method delete">DELETE</span></td><td class="route-path">/moose-agent/:id</td><td>Delete agent definition</td></tr>
+    <tr><td><span class="method patch">PATCH</span></td><td class="route-path">/moose-agent/reorder</td><td>Reorder agents</td></tr>
+    <tr><td colspan="3" style="height:8px;border:none"></td></tr>
+    <tr><td><span class="method get">GET</span></td><td class="route-path">/moose-agent-folder</td><td>List all folders + active folder ID</td></tr>
+    <tr><td><span class="method post">POST</span></td><td class="route-path">/moose-agent-folder</td><td>Create folder</td></tr>
+    <tr><td><span class="method put">PUT</span></td><td class="route-path">/moose-agent-folder/:id</td><td>Update folder</td></tr>
+    <tr><td><span class="method delete">DELETE</span></td><td class="route-path">/moose-agent-folder/:id</td><td>Delete folder</td></tr>
+    <tr><td><span class="method put">PUT</span></td><td class="route-path">/moose-agent-active-folder</td><td>Switch active folder</td></tr>
+    <tr><td colspan="3" style="height:8px;border:none"></td></tr>
+    <tr><td><span class="method get">GET</span></td><td class="route-path">/tools</td><td>List tool groups (for scoping UI)</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== EVENT TABLE ===== -->
+<h2>SSE Event Types</h2>
+
+<table class="event-table">
+  <thead>
+    <tr><th>Event</th><th>Channel</th><th>Payload</th><th>Trigger</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Spawned</code></td>
+      <td>moose.agent.spawned</td>
+      <td>instance, parentInstanceID</td>
+      <td>Instance created</td>
+    </tr>
+    <tr>
+      <td><code>StateChanged</code></td>
+      <td>moose.agent.state_changed</td>
+      <td>instanceID, state, error, timeLastActive</td>
+      <td>State transition</td>
+    </tr>
+    <tr>
+      <td><code>Deleted</code></td>
+      <td>moose.agent.deleted</td>
+      <td>instanceID, workspaceSessionID</td>
+      <td>Instance removed / GC</td>
+    </tr>
+    <tr>
+      <td><code>Moved</code></td>
+      <td>moose.agent.moved</td>
+      <td>instanceID, x, y</td>
+      <td>Position change</td>
+    </tr>
+    <tr>
+      <td><code>Message</code></td>
+      <td>moose.agent.message</td>
+      <td>fromInstanceID, toInstanceID, type, content</td>
+      <td>Inter-agent communication</td>
+    </tr>
+    <tr>
+      <td><code>GCWarning</code></td>
+      <td>moose.agent.gc_warning</td>
+      <td>instanceID, secondsRemaining</td>
+      <td>30s before idle timeout</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ===== STORAGE ===== -->
+<h2>Storage</h2>
+
+<div class="module-grid" style="grid-template-columns: 1fr 1fr">
+  <div class="module-card" style="border-top: 3px solid #4CAF50">
+    <div class="module-card-title" style="color:#4CAF50">moose-agents.json (File)</div>
+    <ul class="module-card-list">
+      <li>Location: <code>~/.config/opencode/moose-agents.json</code></li>
+      <li>Contains: Agent definitions + folder structure</li>
+      <li>Format: <code>{ activeFolder, folders[] }</code></li>
+      <li>Managed by: definition.ts</li>
+      <li>Seeded on first run by seedDefaults()</li>
+    </ul>
+  </div>
+  <div class="module-card" style="border-top: 3px solid #2196F3">
+    <div class="module-card-title" style="color:#2196F3">SQLite (Drizzle ORM)</div>
+    <ul class="module-card-list">
+      <li>Table: <code>agent_instance</code></li>
+      <li>Contains: Runtime canvas instances</li>
+      <li>Fields: id, workspace, definition, session, parent, x, y, state</li>
+      <li>Managed by: instance.ts</li>
+      <li>Ephemeral: instances cleaned by GC</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ===== FOOTER ===== -->
+<div class="footer">
+  Project Moose v0.3.1 &mdash; Built on OpenCode &mdash; github.com/prob32/projectmoose
+</div>
+
+</div>
+</body>
+</html>
