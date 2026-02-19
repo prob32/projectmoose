@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.1-purple?style=flat-square" />
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.1-purple?style=flat-square" />
   <img alt="Built on" src="https://img.shields.io/badge/built%20on-OpenCode-blue?style=flat-square" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
 </p>
@@ -35,6 +35,9 @@ Think of it as a **visual IDE meets agent swarm**: you assign a task to a Bull M
 
 - **Canvas Workspace** — Drag-and-drop node graph where each agent is a visual node with live state indicators (idle, working, spawning, error, question)
 - **Hierarchical Agent Spawning** — Orchestrator agents automatically decompose tasks and spawn child agents, forming a tree of delegation
+- **Agent Folders** — Organize agent definitions into switchable folders (e.g., "Default", "Moose Herd") with per-folder configurations
+- **Tool Scoping** — Fine-grained control over which tools each agent can access, with 8 built-in tool groups (read, edit, command, browser, task, planning, interaction, skills)
+- **Skills System** — Browsable skill registry with install/uninstall support, extending agent capabilities
 - **Real-Time Todo Tracking** — Each agent displays a task badge on its canvas node; click to see a collapsible todo list with progress bars
 - **Configurable Agent Definitions** — Define agent roles, system prompts, models, tools, spawn limits, and idle timeouts via JSON config
 - **Multi-Model Support** — Each agent can use a different LLM (local via LM Studio, or cloud providers like OpenAI, Anthropic, Google)
@@ -81,39 +84,52 @@ cd projectmoose
 # Install dependencies
 bun install
 
-# Start the dev server
-bun run --cwd packages/opencode --conditions=browser src/index.ts web --port 4096
+# Start the dev server (frontend :3000 + backend :4096)
+bun run dev
 ```
 
-Then open `http://127.0.0.1:4096` in your browser.
+Then open `http://localhost:3000` in your browser.
 
 ### Configuration
 
-Agent definitions are configured in `~/.config/opencode/moose-agents.json`:
+Agent definitions are organized into folders in `~/.config/opencode/moose-agents.json`:
 
 ```json
 {
-  "agents": {
-    "bull_moose": {
-      "name": "Bull Moose",
-      "description": "Primary orchestrator that decomposes complex tasks",
-      "color": "#8B5CF6",
-      "role": "orchestrator",
-      "model": {
-        "providerID": "lmstudio",
-        "modelID": "qwen/qwen3-coder-30b"
-      },
-      "spawnable": {
-        "agents": ["junior_moose", "scout_moose", "trail_moose"],
-        "limit": "auto"
-      },
-      "idle_timeout": 300
+  "activeFolder": "default",
+  "folders": [
+    {
+      "id": "default",
+      "name": "Default",
+      "color": "#64b5f6",
+      "agents": [
+        {
+          "id": "architect",
+          "name": "Architect",
+          "description": "High-level orchestrator for complex tasks",
+          "color": "#8B5CF6",
+          "role": "orchestrator",
+          "model": {
+            "providerID": "openrouter",
+            "modelID": "anthropic/claude-sonnet-4"
+          },
+          "tools": {
+            "mode": "scoped",
+            "allow": ["read", "browser", "planning", "interaction", "skills", "task"]
+          },
+          "spawnable": {
+            "agents": ["coder", "ask", "debugger"],
+            "limit": "auto"
+          },
+          "idle_timeout": 300
+        }
+      ]
     }
-  }
+  ]
 }
 ```
 
-See the [moose-agents.json example](docs/moose-agents-example.json) for a complete configuration reference.
+Default agent presets are seeded on first run. Switch between folders using the sidebar folder switcher.
 
 ---
 
@@ -122,34 +138,57 @@ See the [moose-agents.json example](docs/moose-agents-example.json) for a comple
 Project Moose is built as a layer on top of [OpenCode](https://opencode.ai), the open-source AI coding agent:
 
 ```
-┌─────────────────────────────────────────────┐
-│  Frontend (SolidJS)                         │
-│  ├── Agent Canvas (nodes, connections, SVG) │
-│  ├── Agent Chat Panel (per-agent messages)  │
-│  ├── Todo Panel (collapsible task lists)    │
-│  └── Sidebar (agent management)            │
-├─────────────────────────────────────────────┤
-│  Backend (Bun + Hono)                       │
-│  ├── Moose Agent Definitions (JSON config)  │
-│  ├── Agent Instances (SQLite persistence)   │
-│  ├── Session Management (per-agent chats)   │
-│  ├── Task Tool (spawn + delegate + todos)   │
-│  └── SSE Events (real-time state sync)      │
-├─────────────────────────────────────────────┤
-│  OpenCode Core                              │
-│  ├── LLM Provider Abstraction               │
-│  ├── Tool System (file ops, bash, search)   │
-│  ├── Session & Message Storage              │
-│  └── Permission System                      │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│  Frontend (SolidJS :3000)                         │
+│  ├── Agent Canvas (nodes, connections, SVG)       │
+│  ├── Sidebar (folders, agent list, drag-reorder)  │
+│  ├── Agent Chat Panel (per-agent messages)        │
+│  ├── Todo Panel (collapsible task lists)          │
+│  └── Canvas Controls (zoom, pan, minimap)         │
+├───────────────────────────────────────────────────┤
+│  Backend (Bun + Hono :4096)                       │
+│  ├── Agent Definition CRUD  → moose-agents.json   │
+│  ├── Agent Instances        → SQLite (Drizzle)    │
+│  ├── Agent Bridge           → translateMooseToAgent│
+│  ├── Spawn Validation       → isSpawnAllowed()    │
+│  ├── Layout Engine          → force-directed      │
+│  ├── GC + Communication     → idle timeouts, msgs │
+│  ├── Task Tool              → spawn + delegate    │
+│  └── SSE Events (6 types)   → real-time sync      │
+├───────────────────────────────────────────────────┤
+│  OpenCode Core                                    │
+│  ├── LLM Provider Abstraction                     │
+│  ├── Tool System (8 groups, scoped permissions)   │
+│  ├── Session & Message Storage                    │
+│  ├── MCP Server Integration                       │
+│  └── Permission System                            │
+└───────────────────────────────────────────────────┘
 ```
+
+### Moose Agent Modules (v0.3.1)
+
+The agent system is organized into focused modules under `packages/opencode/src/agent/moose/`:
+
+| Module | Responsibility |
+|--------|---------------|
+| `schema.ts` | Zod schemas — single source of truth for all types |
+| `definition.ts` | Agent/folder CRUD and config file management |
+| `instance.ts` | Runtime instances — SQLite persistence via Drizzle |
+| `layout.ts` | Force-directed layout and arc redistribution |
+| `spawn.ts` | Spawn validation, limits, orchestrator detection |
+| `communication.ts` | Parent-child messaging with direction validation |
+| `events.ts` | 6 BusEvent types for SSE streaming |
+| `gc.ts` | Garbage collection with idle timeouts |
+| `presets/` | Default and Moose Herd folder presets |
+
+See [docs/moose-architecture.md](docs/moose-architecture.md) for the full architecture reference.
 
 ### Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | SolidJS, CSS (custom), Canvas SVG |
-| Backend | Bun, Hono, SQLite (Drizzle ORM) |
+| Frontend | SolidJS, Tailwind CSS, Canvas SVG |
+| Backend | Bun, Hono, SQLite (Drizzle ORM), Zod |
 | LLM Integration | OpenCode provider system (LM Studio, OpenAI, Anthropic, Google, etc.) |
 | Real-time | Server-Sent Events (SSE) |
 | State Management | SolidJS stores + reactive signals |
@@ -165,9 +204,13 @@ Project Moose is built as a layer on top of [OpenCode](https://opencode.ai), the
 - [x] Force-directed node layout
 - [x] Agent communication (questions, scope requests)
 - [x] Task completion detection and auto-complete
-- [ ] Group Chat — lasso-select multiple agents into a shared conversation
-- [ ] Agent templates and presets
-- [ ] Canvas zoom and pan controls
+- [x] Group Chat — lasso-select multiple agents into a shared conversation
+- [x] Agent folders and presets
+- [x] Canvas zoom, pan, and minimap controls
+- [x] Skills system (browsable registry with install/uninstall)
+- [x] Tool scoping (8 groups with allow/deny lists)
+- [x] Modular agent architecture (v0.3.1 refactor)
+- [ ] CodeGraph integration (semantic code graph explorer + MCP)
 - [ ] Export/import workspace configurations
 - [ ] Mobile-friendly remote control interface
 
