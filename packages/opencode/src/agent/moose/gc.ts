@@ -23,11 +23,12 @@ export namespace MooseAgentGC {
     Scheduler.register({
       id: "moose.agent.gc",
       interval: SWEEP_INTERVAL_MS,
-      run: () =>
-        Instance.provide({
+      run: async () => {
+        await Instance.provide({
           directory,
           fn: sweep,
-        }),
+        })
+      },
       scope: "instance",
     })
     log.info("GC registered", { interval: SWEEP_INTERVAL_MS, directory })

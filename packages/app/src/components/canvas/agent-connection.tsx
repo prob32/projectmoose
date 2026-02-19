@@ -126,7 +126,7 @@ export const AgentConnection: Component<AgentConnectionProps> = (props) => {
             >
               <animateMotion
                 dur="0.8s"
-                repeatCount="1"
+                repeatCount={1}
                 fill="freeze"
                 path={pulse.toParent ? reversedPathD() : pathD()}
               />
