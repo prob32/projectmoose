@@ -1,5 +1,4 @@
 import z from "zod"
-import { BusEvent } from "@/bus/bus-event"
 import { Bus } from "@/bus"
 import { Database, eq, NotFoundError } from "@/storage/db"
 import { AgentInstanceTable } from "./instance.sql"
@@ -9,6 +8,9 @@ import { fn } from "@/util/fn"
 import { MooseAgentEvent } from "./events"
 import { MooseAgentDefinition } from "./definition"
 import { Session } from "../../session"
+import { AgentInstanceState, AgentInstanceInfo } from "./schema"
+import { repelOverlaps as repelOverlapsCore, redistributeSiblings } from "./layout"
+import { isSpawnAllowed, checkSpawnLimit, calculateChildPosition } from "./spawn"
 
 /** Library of common English names for randomly naming agent instances */
 const AGENT_NAMES = [
@@ -25,33 +27,13 @@ const AGENT_NAMES = [
 export namespace MooseAgentInstance {
   const log = Log.create({ service: "moose.instance" })
 
-  export const State = z.enum(["idle", "working", "error", "question", "spawning"])
-  export type State = z.infer<typeof State>
+  // Re-export schemas under original names for backward compatibility
+  export const State = AgentInstanceState
+  export type State = AgentInstanceState
+  export const Info = AgentInstanceInfo
+  export type Info = AgentInstanceInfo
 
   type InstanceRow = typeof AgentInstanceTable.$inferSelect
-
-  export const Info = z
-    .object({
-      id: Identifier.schema("agent_instance"),
-      workspaceSessionID: z.string(),
-      agentDefinitionID: z.string(),
-      sessionID: z.string().optional(),
-      parentInstanceID: z.string().optional(),
-      positionX: z.number(),
-      positionY: z.number(),
-      state: State,
-      errorMessage: z.string().optional(),
-      displayName: z.string().optional(),
-      timeLastActive: z.number().optional(),
-      time: z.object({
-        created: z.number(),
-        updated: z.number(),
-      }),
-    })
-    .meta({
-      ref: "MooseAgentInstance",
-    })
-  export type Info = z.infer<typeof Info>
 
   export function fromRow(row: InstanceRow): Info {
     return {
@@ -307,55 +289,10 @@ export namespace MooseAgentInstance {
 
   /**
    * Run a simple force-directed repulsion pass to push overlapping nodes apart.
-   * Iterates a few times to resolve clusters. Only moves nodes that overlap
-   * within a minimum distance threshold.
+   * Delegates to layout.ts via callback injection.
    */
   export async function repelOverlaps(workspaceSessionID: string) {
-    const MIN_DISTANCE = 100 // nodes closer than this get pushed apart
-    const ITERATIONS = 3
-
-    for (let iter = 0; iter < ITERATIONS; iter++) {
-      const all = listByWorkspace(workspaceSessionID)
-      if (all.length < 2) return
-
-      const moves: Array<{ id: string; x: number; y: number }> = []
-
-      for (let i = 0; i < all.length; i++) {
-        let fx = 0
-        let fy = 0
-        for (let j = 0; j < all.length; j++) {
-          if (i === j) continue
-          const dx = all[i].positionX - all[j].positionX
-          const dy = all[i].positionY - all[j].positionY
-          const dist = Math.sqrt(dx * dx + dy * dy)
-          if (dist < MIN_DISTANCE && dist > 0) {
-            // Push apart proportionally to overlap
-            const force = (MIN_DISTANCE - dist) / 2
-            fx += (dx / dist) * force
-            fy += (dy / dist) * force
-          } else if (dist === 0) {
-            // Identical positions: push in a random-ish direction based on index
-            const angle = (i * 2.39996) % (Math.PI * 2) // golden angle
-            fx += Math.cos(angle) * (MIN_DISTANCE / 2)
-            fy += Math.sin(angle) * (MIN_DISTANCE / 2)
-          }
-        }
-
-        if (Math.abs(fx) > 1 || Math.abs(fy) > 1) {
-          moves.push({
-            id: all[i].id,
-            x: Math.round(all[i].positionX + fx),
-            y: Math.round(all[i].positionY + fy),
-          })
-        }
-      }
-
-      if (moves.length === 0) break // no overlaps, done
-
-      for (const m of moves) {
-        await move({ instanceID: m.id, x: m.x, y: m.y })
-      }
-    }
+    await repelOverlapsCore(workspaceSessionID, listByWorkspace, async (inp) => { await move(inp) })
   }
 
   /** Spawn a validated child agent instance from a parent */
@@ -378,7 +315,7 @@ export namespace MooseAgentInstance {
       }
 
       // 3. Validate child is in spawnable list
-      if (!parentDef.spawnable?.agents?.includes(input.childDefinitionID)) {
+      if (!isSpawnAllowed(parentDef, input.childDefinitionID)) {
         throw new Error(
           `Agent "${parentDef.id}" cannot spawn "${input.childDefinitionID}". Allowed: ${parentDef.spawnable?.agents?.join(", ") ?? "none"}`,
         )
@@ -386,18 +323,10 @@ export namespace MooseAgentInstance {
 
       // 4. Check spawn limit
       const existingChildren = listByParent(input.parentInstanceID)
-      const limit = parentDef.spawnable.limit
-      if (typeof limit === "number" && existingChildren.length >= limit) {
-        throw new Error(`Spawn limit reached: ${existingChildren.length}/${limit} children`)
-      }
-      if (limit === "auto" && existingChildren.length >= 20) {
-        throw new Error(`Auto spawn limit reached: maximum 20 children`)
-      }
+      checkSpawnLimit(parentDef, existingChildren.length)
 
       // 5. Calculate temporary child position (will be redistributed after creation)
-      const distance = 160
-      const childX = input.positionX ?? Math.round(parent.positionX)
-      const childY = input.positionY ?? Math.round(parent.positionY + distance)
+      const pos = calculateChildPosition(parent.positionX, parent.positionY, input.positionX, input.positionY)
 
       // 6. Get child definition for session title
       const childDef = await MooseAgentDefinition.get(input.childDefinitionID)
@@ -420,24 +349,16 @@ export namespace MooseAgentInstance {
         agentDefinitionID: input.childDefinitionID,
         sessionID: session.id,
         parentInstanceID: input.parentInstanceID,
-        positionX: childX,
-        positionY: childY,
+        positionX: pos.x,
+        positionY: pos.y,
       })
 
       // 10. Redistribute ALL siblings evenly around the parent to prevent overlap
       if (!input.positionX && !input.positionY) {
-        const allSiblings = listByParent(input.parentInstanceID)
-        const total = allSiblings.length
-        const maxSlots = 12
-        const spreadAngle = Math.PI * 0.8 // 144° arc below parent
-        const startAngle = Math.PI / 2 - spreadAngle / 2
-        for (let i = 0; i < total; i++) {
-          const step = total <= 1 ? 0 : spreadAngle / (Math.min(maxSlots, total) - 1)
-          const angle = total === 1 ? Math.PI / 2 : startAngle + i * step
-          const newX = Math.round(parent.positionX + Math.cos(angle) * distance)
-          const newY = Math.round(parent.positionY + Math.sin(angle) * distance)
-          await move({ instanceID: allSiblings[i].id, x: newX, y: newY })
-        }
+        await redistributeSiblings(
+          input.parentInstanceID, parent.positionX, parent.positionY,
+          listByParent, async (inp) => { await move(inp) },
+        )
       }
 
       // 11. Run repulsion pass to push apart any overlapping nodes across the whole canvas

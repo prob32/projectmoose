@@ -12,6 +12,8 @@ import { Config } from "../config/config"
 import { PermissionNext } from "@/permission/next"
 import { MooseAgentInstance } from "../agent/moose/instance"
 import { MooseAgentDefinition } from "../agent/moose/definition"
+import { redistributeSiblings } from "../agent/moose/layout"
+import { isSpawnAllowed, isOrchestrator } from "../agent/moose/spawn"
 import { Todo } from "../session/todo"
 import { Log } from "@/util/log"
 
@@ -107,16 +109,15 @@ export const TaskTool = Tool.define("task", async (ctx) => {
 
         try {
           const callerDef = await MooseAgentDefinition.get(callerDefID)
-          if (callerDef?.spawnable?.agents?.length) {
-            const allowed = new Set(callerDef.spawnable.agents)
-            if (!allowed.has(params.subagent_type)) {
+          if (callerDef && isOrchestrator(callerDef)) {
+            if (!isSpawnAllowed(callerDef, params.subagent_type)) {
               log.warn("BLOCKED — spawnable denied", {
                 caller: callerDef.id,
                 target: params.subagent_type,
-                allowed: callerDef.spawnable.agents,
+                allowed: callerDef.spawnable?.agents,
               })
               throw new Error(
-                `Agent "${callerDef.name}" (${callerDef.id}) is not allowed to delegate to "${params.subagent_type}". Allowed agents: ${callerDef.spawnable.agents.join(", ")}`,
+                `Agent "${callerDef.name}" (${callerDef.id}) is not allowed to delegate to "${params.subagent_type}". Allowed agents: ${callerDef.spawnable?.agents?.join(", ") ?? "none"}`,
               )
             }
             log.info("spawnable ALLOWED", { caller: callerDef.id, target: params.subagent_type })
@@ -146,7 +147,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       try {
         const mooseDef = await MooseAgentDefinition.get(params.subagent_type)
         if (mooseDef) {
-          childIsOrchestrator = !!(mooseDef.spawnable?.agents?.length)
+          childIsOrchestrator = isOrchestrator(mooseDef)
           const parentMooseInstance = MooseAgentInstance.findBySessionID(ctx.sessionID)
           if (parentMooseInstance) {
             // Look for an existing idle child of the same type under this parent
@@ -235,21 +236,10 @@ export const TaskTool = Tool.define("task", async (ctx) => {
               })
 
               // Redistribute ALL siblings evenly around the parent to prevent overlap
-              // This handles concurrent spawns: each spawn redistributes everyone
-              const allSiblings = MooseAgentInstance.listByParent(parentMooseInstance.id)
-              const total = allSiblings.length
-              const maxSlots = 12
-              const spreadAngle = Math.PI * 0.8 // 144° arc below parent
-              const startAngle = Math.PI / 2 - spreadAngle / 2
-              const distance = 160
-
-              for (let i = 0; i < total; i++) {
-                const step = total <= 1 ? 0 : spreadAngle / (Math.min(maxSlots, total) - 1)
-                const angle = total === 1 ? Math.PI / 2 : startAngle + i * step
-                const newX = Math.round(parentMooseInstance.positionX + Math.cos(angle) * distance)
-                const newY = Math.round(parentMooseInstance.positionY + Math.sin(angle) * distance)
-                await MooseAgentInstance.move({ instanceID: allSiblings[i].id, x: newX, y: newY })
-              }
+              await redistributeSiblings(
+                parentMooseInstance.id, parentMooseInstance.positionX, parentMooseInstance.positionY,
+                MooseAgentInstance.listByParent, async (inp) => { await MooseAgentInstance.move(inp) },
+              )
 
               // Run repulsion pass to push apart any overlapping nodes across the whole canvas
               await MooseAgentInstance.repelOverlaps(parentMooseInstance.workspaceSessionID)

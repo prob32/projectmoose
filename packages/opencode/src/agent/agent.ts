@@ -16,12 +16,114 @@ import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 import { PermissionNext } from "@/permission/next"
 import { MooseAgentDefinition } from "./moose/definition"
+import { isOrchestrator } from "./moose/spawn"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import { Global } from "@/global"
 import path from "path"
 import { Plugin } from "@/plugin"
 import { Skill } from "../skill"
 import { expandToolGroups } from "../tool/registry"
+
+function buildToolPerms(def: MooseAgentDefinition.Info): Record<string, "allow" | "deny"> {
+  const toolPerms: Record<string, "allow" | "deny"> = {}
+  if (def.tools?.mode === "scoped" && def.tools.allow?.length) {
+    const allowed = expandToolGroups(def.tools.allow)
+    toolPerms["*"] = "deny"
+    for (const toolId of allowed) {
+      toolPerms[toolId] = "allow"
+    }
+    toolPerms["invalid"] = "allow"
+  } else if (def.tools?.mode === "all" && def.tools.deny?.length) {
+    const denied = expandToolGroups(def.tools.deny)
+    for (const toolId of denied) {
+      toolPerms[toolId] = "deny"
+    }
+  }
+  return toolPerms
+}
+
+type PermAction = "allow" | "ask" | "deny"
+type PermRule = PermAction | Record<string, PermAction>
+
+function buildOrchestratorPerms(isOrch: boolean): Record<string, PermRule> {
+  return isOrch
+    ? {
+        task: "allow",
+        question: "allow",
+        plan_enter: "allow",
+        plan_exit: "allow",
+        todoread: "allow",
+        todowrite: "allow",
+      }
+    : {
+        todoread: "deny",
+        todowrite: "deny",
+      }
+}
+
+function buildMcpPerms(def: MooseAgentDefinition.Info): Record<string, PermRule> {
+  const mcpPerms: Record<string, PermRule> = {}
+  if (def.mcp?.deny) {
+    for (const denied of def.mcp.deny) {
+      mcpPerms[denied] = "deny"
+    }
+  }
+  return mcpPerms
+}
+
+function buildPlanPerms(def: MooseAgentDefinition.Info): Record<string, PermRule> {
+  return def.permissionMode === "plan"
+    ? { edit: { "*": "deny" } as Record<string, PermAction>, plan_exit: "allow" as PermAction }
+    : {}
+}
+
+function buildThinkingOptions(def: MooseAgentDefinition.Info): Record<string, any> {
+  const options: Record<string, any> = {}
+  if (def.thinking) {
+    if (def.thinking.budget) {
+      options.thinking = { type: "enabled", budgetTokens: def.thinking.budget }
+    }
+    if (def.thinking.effort) {
+      options.reasoningEffort = def.thinking.effort
+    }
+  }
+  return options
+}
+
+function translateMooseToAgent(
+  def: MooseAgentDefinition.Info,
+  defaults: PermissionNext.Ruleset,
+  user: PermissionNext.Ruleset,
+): Agent.Info {
+  const toolPerms = buildToolPerms(def)
+  const orchestratorPerms = buildOrchestratorPerms(isOrchestrator(def))
+  const mcpPerms = buildMcpPerms(def)
+  const planPerms = buildPlanPerms(def)
+  const thinkingOptions = buildThinkingOptions(def)
+
+  return {
+    name: def.id,
+    description: def.description ?? `Moose agent: ${def.name}`,
+    mode: "subagent",
+    prompt: def.prompt,
+    model: def.model,
+    temperature: def.temperature,
+    color: def.color,
+    permission: PermissionNext.merge(
+      defaults,
+      PermissionNext.fromConfig({
+        ...toolPerms,
+        ...orchestratorPerms,
+        ...mcpPerms,
+        ...planPerms,
+      }),
+      user,
+    ),
+    options: thinkingOptions,
+    skills: def.skills?.length ? def.skills : undefined,
+    native: false,
+  }
+}
 
 export namespace Agent {
   export const Info = z
@@ -241,94 +343,7 @@ export namespace Agent {
       for (const def of mooseDefs) {
         // Don't override user-configured or built-in agents
         if (result[def.id]) continue
-
-        // Build MCP-scoped permissions from the definition's mcp config
-        const mcpPerms: Record<string, string | Record<string, string>> = {}
-        if (def.mcp?.deny) {
-          for (const denied of def.mcp.deny) {
-            mcpPerms[denied] = "deny"
-          }
-        }
-
-        // Orchestrators (agents with spawnable config) get the full tool suite:
-        // task, question, plan, and todo tools. Leaf agents keep defaults.
-        const isOrchestrator = !!(def.spawnable?.agents?.length)
-        const orchestratorPerms: Record<string, string> = isOrchestrator
-          ? {
-              task: "allow",
-              question: "allow",
-              plan_enter: "allow",
-              plan_exit: "allow",
-              todoread: "allow",
-              todowrite: "allow",
-            }
-          : {
-              todoread: "deny",
-              todowrite: "deny",
-            }
-
-        // If permissionMode is "plan", restrict edit tools (same as native plan agent)
-        const planPerms: Record<string, string | Record<string, string>> =
-          def.permissionMode === "plan"
-            ? {
-                edit: { "*": "deny" },
-                plan_exit: "allow",
-              }
-            : {}
-
-        // Build tool scoping permissions from the definition's tools config
-        // When mode="scoped", only tools in the allow list (expanded from groups) are permitted.
-        // When mode="all", tools in the deny list are denied.
-        const toolPerms: Record<string, "allow" | "deny"> = {}
-        if (def.tools?.mode === "scoped" && def.tools.allow?.length) {
-          const allowed = expandToolGroups(def.tools.allow)
-          // Deny everything by default, then allow specific tools
-          toolPerms["*"] = "deny"
-          for (const toolId of allowed) {
-            toolPerms[toolId] = "allow"
-          }
-          // Always allow the "invalid" meta-tool
-          toolPerms["invalid"] = "allow"
-        } else if (def.tools?.mode === "all" && def.tools.deny?.length) {
-          const denied = expandToolGroups(def.tools.deny)
-          for (const toolId of denied) {
-            toolPerms[toolId] = "deny"
-          }
-        }
-
-        // Build thinking/reasoning options from the definition
-        const thinkingOptions: Record<string, any> = {}
-        if (def.thinking) {
-          if (def.thinking.budget) {
-            thinkingOptions.thinking = { type: "enabled", budgetTokens: def.thinking.budget }
-          }
-          if (def.thinking.effort) {
-            thinkingOptions.reasoningEffort = def.thinking.effort
-          }
-        }
-
-        result[def.id] = {
-          name: def.id,
-          description: def.description ?? `Moose agent: ${def.name}`,
-          mode: "subagent",
-          prompt: def.prompt,
-          model: def.model,
-          temperature: def.temperature,
-          color: def.color,
-          permission: PermissionNext.merge(
-            defaults,
-            PermissionNext.fromConfig({
-              ...toolPerms,
-              ...orchestratorPerms,
-              ...mcpPerms,
-              ...planPerms,
-            }),
-            user,
-          ),
-          options: thinkingOptions,
-          skills: def.skills?.length ? def.skills : undefined,
-          native: false,
-        }
+        result[def.id] = translateMooseToAgent(def, defaults, user)
       }
     } catch {
       // Moose definitions may not be available yet during early bootstrap

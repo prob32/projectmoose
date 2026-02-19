@@ -1,30 +1,12 @@
 import z from "zod"
 import { BusEvent } from "@/bus/bus-event"
+import { AgentInstanceInfo, AgentInstanceState, AgentMessageType } from "./schema"
 
 export namespace MooseAgentEvent {
-  /** Inline schema to avoid circular dependency with instance.ts */
-  const InstanceInfo = z.object({
-    id: z.string(),
-    workspaceSessionID: z.string(),
-    agentDefinitionID: z.string(),
-    sessionID: z.string().optional(),
-    parentInstanceID: z.string().optional(),
-    positionX: z.number(),
-    positionY: z.number(),
-    state: z.enum(["idle", "working", "error", "question", "spawning"]),
-    errorMessage: z.string().optional(),
-    displayName: z.string().optional(),
-    timeLastActive: z.number().optional(),
-    time: z.object({
-      created: z.number(),
-      updated: z.number(),
-    }),
-  })
-
   export const Spawned = BusEvent.define(
     "moose.agent.spawned",
     z.object({
-      instance: InstanceInfo,
+      instance: AgentInstanceInfo,
       parentInstanceID: z.string().optional(),
     }),
   )
@@ -33,7 +15,7 @@ export namespace MooseAgentEvent {
     "moose.agent.state_changed",
     z.object({
       instanceID: z.string(),
-      state: z.enum(["idle", "working", "error", "question", "spawning"]),
+      state: AgentInstanceState,
       error: z.string().optional(),
       timeLastActive: z.number().optional(),
     }),
@@ -61,7 +43,7 @@ export namespace MooseAgentEvent {
     z.object({
       fromInstanceID: z.string(),
       toInstanceID: z.string(),
-      type: z.enum(["question", "scope_request", "answer", "result"]),
+      type: AgentMessageType,
       content: z.string(),
     }),
   )

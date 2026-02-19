@@ -1,3 +1,8 @@
 export { MooseAgentDefinition } from "./definition"
 export { MooseAgentInstance } from "./instance"
 export { MooseAgentEvent } from "./events"
+export { MooseAgentCommunication } from "./communication"
+export { MooseAgentGC } from "./gc"
+export * from "./schema"
+export * from "./layout"
+export * from "./spawn"

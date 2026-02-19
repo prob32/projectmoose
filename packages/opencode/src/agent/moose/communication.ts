@@ -4,6 +4,7 @@ import { Bus } from "@/bus"
 import { Log } from "@/util/log"
 import { MooseAgentInstance } from "./instance"
 import { MooseAgentEvent } from "./events"
+import { AgentMessageType } from "./schema"
 
 export namespace MooseAgentCommunication {
   const log = Log.create({ service: "moose.communication" })
@@ -14,8 +15,8 @@ export namespace MooseAgentCommunication {
   /** Message types that a parent can send to its child */
   const PARENT_TO_CHILD_TYPES = ["answer", "result"] as const
 
-  export const MessageType = z.enum(["question", "scope_request", "answer", "result"])
-  export type MessageType = z.infer<typeof MessageType>
+  export const MessageType = AgentMessageType
+  export type MessageType = AgentMessageType
 
   /**
    * Send a message between parent and child instances.
